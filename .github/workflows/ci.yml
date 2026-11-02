@@ -1,8 +1,57 @@
 name: Rust validation
-on: [push, pull_request]
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  MODORCH_REVISION: ccc77ce9501cd3e942677bba51b6ff3efb1c63f6
+  CARGO_INCREMENTAL: '0'
+
 jobs:
-  check:
+  changes:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.code == 'true' }}
+      rustdoc: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.rustdoc == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        # PR detection uses the API; manual runs always request full validation.
+        if: github.event_name == 'push'
+      - uses: dorny/paths-filter@v3
+        if: github.event_name != 'workflow_dispatch'
+        id: filter
+        with:
+          # Exclusions must all hold; unknown paths conservatively require validation.
+          predicate-quantifier: every
+          filters: |
+            code:
+              - '**'
+              - '!README.md'
+              - '!LICENSE'
+              - '!docs/**/*.md'
+            rustdoc:
+              - '{src/**/*.rs,crates/**/src/**/*.rs,Cargo.toml,Cargo.lock,crates/**/Cargo.toml,rust-toolchain.toml,.cargo/**,.agents/**,.github/workflows/**}'
+
+  validate:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: fedengine
     steps:
       - uses: actions/checkout@v4
         with:
@@ -10,24 +59,68 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: muidea/modorch-rs
-          ref: ccc77ce9501cd3e942677bba51b6ff3efb1c63f6
+          ref: ${{ env.MODORCH_REVISION }}
           path: modorch-rs
       - uses: dtolnay/rust-toolchain@1.94.0
         with:
           components: rustfmt, clippy
-      - name: Check framework identity
-        working-directory: fedengine
-        run: python3 .agents/skills/modorch-app-development/scripts/preflight.py --manifest-path Cargo.toml
-      - name: Validate
-        working-directory: fedengine
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: fedengine -> target
+          key: modorch-${{ env.MODORCH_REVISION }}
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+      - name: Restore DuckDB native library and extensions
+        uses: actions/cache/restore@v4
+        id: duckdb-cache
+        with:
+          path: |
+            fedengine/target/duckdb-download
+            fedengine/data/extensions
+          key: duckdb-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('fedengine/Cargo.lock', 'fedengine/scripts/fetch-extensions.py') }}
+      - name: Resolve dependencies and check framework identity
         run: |
-          cargo fmt --all -- --check
-          cargo check --workspace --all-targets --locked
-          cargo clippy --workspace --all-targets --locked -- -D warnings
-          cargo test --workspace --locked
-          cargo doc --workspace --no-deps --locked
-          cargo build --locked
-          python3 scripts/smoke.py
+          cargo fetch --locked
+          python3 .agents/skills/modorch-app-development/scripts/preflight.py --manifest-path Cargo.toml
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Tests
+        run: cargo test --workspace --locked
+      - name: Binary smoke
+        # Root integration tests cause cargo test to build target/debug/fedengine.
+        run: python3 scripts/smoke.py
+      - name: Rustdoc
+        if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.rustdoc == 'true'
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --no-deps --locked
       - name: Disposable federation integration
-        working-directory: fedengine
         run: scripts/test-federation.sh
+      - name: Save DuckDB native library and extensions
+        if: github.ref == 'refs/heads/master' && steps.duckdb-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            fedengine/target/duckdb-download
+            fedengine/data/extensions
+          key: ${{ steps.duckdb-cache.outputs.cache-primary-key }}
+
+  # Keep the existing required check name, including on documentation-only PRs.
+  check:
+    if: always()
+    needs: [changes, validate]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require successful validation or a documentation-only skip
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          CODE_CHANGED: ${{ needs.changes.outputs.code }}
+          VALIDATION_RESULT: ${{ needs.validate.result }}
+        run: |
+          test "$CHANGES_RESULT" = success
+          case "$CODE_CHANGED:$VALIDATION_RESULT" in
+            true:success) echo 'Code validation passed.' ;;
+            false:skipped) echo 'Documentation-only change; build skipped.' ;;
+            *) echo 'Required validation failed, was canceled, or was unexpectedly skipped.'; exit 1 ;;
+          esac

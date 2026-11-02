@@ -64,6 +64,26 @@ scripts/test-federation.sh
 
 扩展通过 HTTPS 下载官方 `postgres_scanner`、`mysql_scanner`，保存核心版本、平台、来源 URL 和 SHA256；运行时核对清单与文件，并保留 DuckDB 签名验证。业务 SQL 无法 INSTALL/LOAD，生产推荐预置离线扩展，`install_extensions=false`。升级核心/扩展/源版本后须重验对应能力矩阵。
 
+## CI 执行策略
+
+Actions 在 PR、`master` 分支 push 和手动触发时执行。普通分支 push 由对应 PR 承接验证；同一 PR 或分支的新运行会取消旧运行。
+
+`changes` 判断改动范围，`validate` 在一个 job 内共享构建目录，最终 `check` 汇总结果。分支保护继续使用 `check`：只有改动判断成功，且代码验证成功或纯文档变更按规则跳过时才通过；失败、取消和意外跳过都不能伪报通过。
+
+| 改动 / 触发方式 | 执行内容 |
+|---|---|
+| 仅 `README.md`、`LICENSE`、`docs/**/*.md` | 跳过 Rust 构建和数据库集成，完成最终 `check` |
+| 其他路径，包括代码、配置、示例、依赖、脚本、skill、CI，以及未知新路径 | fmt、依赖准备、框架指纹、Clippy、workspace 测试、真实进程 smoke、一次性数据库联邦集成 |
+| 上述验证中的 Rust 源码、包清单、锁文件、工具链、Cargo 设置、skill 或 CI 变更 | 额外执行 Rustdoc，警告视为错误；保守覆盖公共 API 文档变更 |
+| `master` 上的非纯文档变更 | 完整验证，包含 Rustdoc |
+| 手动触发 | 无论改动范围如何都执行完整验证 |
+
+CI 删除独立 `cargo check`，由同范围的 Clippy 完成编译检查。根包集成测试会使 `cargo test` 构建 `target/debug/fedengine`，smoke 直接使用该程序，因此删除独立 `cargo build`。本地仍可使用上文列出的完整检查命令。
+
+Cargo 依赖及编译产物通过 Rust cache 复用，key 包含固定的 Modorch revision；DuckDB 原生库和扩展通过单独缓存复用，key 包含 runner 平台、架构、Cargo.lock 和扩展下载脚本。扩展脚本在命中缓存后仍校验 manifest 与文件 SHA256。只有 `master` 运行保存缓存，PR 使用缓存并在缺失时正常下载和构建。
+
+恢复缓存后先执行 `cargo fetch --locked`，再执行离线指纹预检，保证冷缓存也能工作。格式检查放在缓存恢复和依赖下载之前，以便尽早失败。未增加构建矩阵或将 Rust 检查拆成多个重复编译的 job；实际节省时间以 Actions 分步耗时为准。
+
 ## 容器
 
 构建上下文为同时包含 fedengine 和 modorch-rs 的父目录：
