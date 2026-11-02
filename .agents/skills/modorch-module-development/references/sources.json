@@ -1,0 +1,83 @@
+{
+  "revision": "1.0.3",
+  "sources": [
+    {
+      "target": "references/component-model.md",
+      "source": "docs/concepts/component-model.md",
+      "source_sha256": "efb58328efae91cf91949eea6af16acc25eed4d332dacb66dc0f924af2be0fbe",
+      "snapshot_sha256": "b1682d4dc55636e6bb8e41bc0f1ac61accae0ca7e9329d99ccd316241dafed5c"
+    },
+    {
+      "target": "references/contracts/README.md",
+      "source": "contracts/README.md",
+      "source_sha256": "406e52fc4a4da271d4a31a56ab1d5f90ebea4dde3cb342af14419361c8e00744",
+      "snapshot_sha256": "e09a521093099e9474c15acaa65959f976b894f642d7e8713a17b54ac420e563"
+    },
+    {
+      "target": "references/contracts/compatibility-contract.md",
+      "source": "contracts/compatibility-contract.md",
+      "source_sha256": "10ae448a03690eee24502004f17b5a5fac60d5b7501950724fb1e63b03c49118",
+      "snapshot_sha256": "ef7bbd4b2147bedb67cadb267c0c7f510e61635335559f465d7d806dda866ff3"
+    },
+    {
+      "target": "references/contracts/component-contract.md",
+      "source": "contracts/component-contract.md",
+      "source_sha256": "5970b2a0312652329e2a283fa52664d213e4d1d35ec68360fb5dbc6ba37d12c9",
+      "snapshot_sha256": "dafd97836210f2cacf2f95ab037b8536d2a48412a3cef0d7e94e4355ac4cf39e"
+    },
+    {
+      "target": "references/contracts/dependency-contract.md",
+      "source": "contracts/dependency-contract.md",
+      "source_sha256": "57999a49bdd0a5211e85eab2078b8d8708c26ba7af5e7d003c9b7706021fe101",
+      "snapshot_sha256": "0ce0e4600fea2bc874fe900351f311a589c12e345b3e047cf3d1cf3313a904be"
+    },
+    {
+      "target": "references/contracts/lifecycle-contract.md",
+      "source": "contracts/lifecycle-contract.md",
+      "source_sha256": "8619b215eefafcc19cc4a037cac5a6d4fbb22d7853075516abb7c7b7fc09798d",
+      "snapshot_sha256": "42588cd2e1dc8eaa7f416e7509e249c130d17466c807d1efc3abec7d7597b66a"
+    },
+    {
+      "target": "references/contracts/messaging-contract.md",
+      "source": "contracts/messaging-contract.md",
+      "source_sha256": "05bfc6e8296412a381358736f75c64aabd2861693bd8b3f016d000fe85e82d0e",
+      "snapshot_sha256": "7a48960d8f56d1fc9f9972cacdaab3df1be11d16f567f95484177e0a84463f53"
+    },
+    {
+      "target": "references/contracts/resource-contract.md",
+      "source": "contracts/resource-contract.md",
+      "source_sha256": "a9c9eee4f637998ec53965ba9c1b3f7f99235b2f83e905dab7e8fc009d13ee9b",
+      "snapshot_sha256": "c3fb2fc51ee0e1c376666ef883b66776c9c379e773a9c8d37b2f90e96c072e6f"
+    },
+    {
+      "target": "references/contracts/scheduler-contract.md",
+      "source": "contracts/scheduler-contract.md",
+      "source_sha256": "30a5a18eade561c9ce3dbc34f48f13b160e833cf7f1d0c3a87ce9504b4182aba",
+      "snapshot_sha256": "1aff9005c29587a0e9e87a9e4fe18f3f1b53ddd7ae80e879fb9c022b6ed70f89"
+    },
+    {
+      "target": "references/contracts/validation-contract.md",
+      "source": "contracts/validation-contract.md",
+      "source_sha256": "cbfefd88f53a1276d715023574618cfe5324d9e716cc38ce5a683edd24897228",
+      "snapshot_sha256": "f638a00a102a18036b5f329fe4b4f5c799fc89a5cea5ac1873eb2a5fa2af15f3"
+    },
+    {
+      "target": "references/lifecycle.md",
+      "source": "docs/concepts/lifecycle.md",
+      "source_sha256": "c512ab4116ff64dc1bf700485371b3d667d171c6de35d0a27e54eb4a88f3ac28",
+      "snapshot_sha256": "bf2d7b2a428c60d9f67663dfffdc82b9a735859d4501da4d963674dd985e9f7b"
+    },
+    {
+      "target": "references/messaging.md",
+      "source": "docs/guides/messaging.md",
+      "source_sha256": "f3202f68703b7b9440849e05f9dd35ebf2b397f0165e8477b3e65c35022f75ae",
+      "snapshot_sha256": "0243d3dd53e27c8d10f16dfd1c09f9a2efec02ffda7ed40c3c7230224b3384d9"
+    },
+    {
+      "target": "references/validation.md",
+      "source": "docs/testing-guide.md",
+      "source_sha256": "1b8158f57b26bba165cf0f27392086774c4dd97fd85397a8cb99147bbaec26a6",
+      "snapshot_sha256": "d0095ac81cced3df35492240f2cc06093f53f59be830048a2ab5c68ffa654965"
+    }
+  ]
+}

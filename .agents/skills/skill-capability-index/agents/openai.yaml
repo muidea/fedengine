@@ -1,0 +1,4 @@
+interface:
+  display_name: "Skill Capability Index"
+  short_description: "Resolve ambiguity among available skills"
+  default_prompt: "Use $skill-capability-index only when two or more currently available skills plausibly match. Verify availability before selection, prefer an exact project-local skill, allow primary=none, and never classify behavior-changing feature or contract work as go-refactor-pro merely because the request says refactor, cleanup, unify, or converge."

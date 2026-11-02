@@ -1,0 +1,20 @@
+[package]
+name = "fedengine-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+fedengine-core.workspace = true
+fedengine-contract.workspace = true
+fedengine-datasource.workspace = true
+fedengine-duckdb.workspace = true
+fedengine-catalog.workspace = true
+fedengine-policy.workspace = true
+fedengine-query.workspace = true
+fedengine-pgwire.workspace = true
+modorch.workspace = true
+tokio.workspace = true
+tracing.workspace = true

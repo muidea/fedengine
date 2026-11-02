@@ -1,0 +1,65 @@
+[package]
+name = "fedengine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+rust-version = "1.94"
+publish = false
+
+[workspace.dependencies]
+modorch = { path = "../modorch-rs/crates/modorch", version = "=0.0.1" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "signal", "time", "io-util"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+async-trait = "0.1"
+futures = "0.3"
+bytes = "1"
+tracing = "0.1"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+pgwire = "=0.42.1"
+duckdb = { version = "=1.20000.1", features = ["download-lib", "chrono", "uuid"] }
+sqlparser = { version = "0.62", features = ["visitor"] }
+chrono = "0.4"
+uuid = "1"
+rustls-pemfile = "2"
+tokio-rustls = "0.26"
+rand = "0.10"
+fedengine-core = { path = "crates/fedengine-core" }
+fedengine-contract = { path = "crates/fedengine-contract" }
+fedengine-datasource = { path = "crates/fedengine-datasource" }
+fedengine-ddl = { path = "crates/fedengine-ddl" }
+fedengine-policy = { path = "crates/fedengine-policy" }
+fedengine-catalog = { path = "crates/fedengine-catalog" }
+fedengine-duckdb = { path = "crates/fedengine-duckdb" }
+fedengine-query = { path = "crates/fedengine-query" }
+fedengine-pg-compat = { path = "crates/fedengine-pg-compat" }
+fedengine-pgwire = { path = "crates/fedengine-pgwire" }
+fedengine-app = { path = "crates/fedengine-app" }
+
+[dependencies]
+fedengine-app.workspace = true
+fedengine-core.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+tokio-postgres = { version = "0.7", features = ["with-chrono-0_4", "with-uuid-1"] }
+postgres-protocol = "0.6"
+duckdb.workspace = true
+tokio-rustls.workspace = true
+rustls-pemfile.workspace = true
+chrono.workspace = true
+uuid.workspace = true

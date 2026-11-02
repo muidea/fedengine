@@ -1,0 +1,35 @@
+# Default local development profile, without remote data sources.
+# Production must configure TLS certificate/key and tls_required=true.
+[application]
+name = "fedengine"
+[pgwire]
+listen = "127.0.0.1:15432"
+max_connections = 256
+startup_timeout_ms = 10000
+query_timeout_ms = 60000
+output_timeout_ms = 10000
+tls_required = false
+max_statements = 128
+max_portals = 64
+[duckdb]
+database_path = ":memory:"
+max_workers = 8
+threads = 4
+memory_limit = "1GB"
+temp_directory = "./data/tmp"
+result_channel_batches = 8
+batch_rows = 512
+acquire_timeout_ms = 5000
+install_extensions = false
+pool_max_connections = 16
+pool_wait_timeout_ms = 30000
+[ddl]
+enabled = true
+allow_drop_schema = false
+source_lock_timeout_ms = 30000
+[shutdown]
+grace_period_secs = 30
+[[users]]
+name = "fedengine"
+password_secret_ref = "FEDENGINE_PASSWORD"
+# Datasources and capability records are optional; see examples/config/federation.toml.

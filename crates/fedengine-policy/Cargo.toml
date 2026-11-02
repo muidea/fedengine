@@ -1,0 +1,15 @@
+[package]
+name = "fedengine-policy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+fedengine-core.workspace = true
+fedengine-ddl.workspace = true
+modorch.workspace = true
+
+[dev-dependencies]
+toml.workspace = true

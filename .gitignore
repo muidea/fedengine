@@ -1,0 +1,27 @@
+# Rust build outputs and downloaded native libraries/sources.
+/target/
+
+# Runtime data, temporary query files and downloaded DuckDB extensions.
+/data/
+
+# Local secrets and machine-specific configuration.
+.env
+.env.*
+!.env.example
+!.env.sample
+/config/*.local.toml
+/secrets/
+
+# Local validation reports, execution logs and intermediate summaries.
+/docs/validation/
+*.log
+
+# Python caches and editor temporary files.
+__pycache__/
+*.py[cod]
+*.swp
+*.swo
+*~
+
+# Keep project skill-hub snapshots: CI preflight reads .agents/skills/.
+# Keep tests/fixtures/server.crt and server.key: public TLS test fixtures.

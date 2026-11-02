@@ -1,0 +1,12 @@
+[application]
+name = "modular-service"
+[initiators.settings]
+enabled = true
+[modules.echo]
+enabled = true
+[messaging]
+default_queue_capacity = 8
+per_shard_capacity = 8
+publish_when_full = "reject"
+[shutdown]
+grace_period_secs = 3

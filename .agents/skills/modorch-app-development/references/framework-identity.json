@@ -1,0 +1,58 @@
+{
+  "compatible_versions": [
+    "0.0.1"
+  ],
+  "contracts_revision": "1.0.0",
+  "features": [
+    "default",
+    "runtime",
+    "eventhub",
+    "scheduler",
+    "config-toml",
+    "observability"
+  ],
+  "framework_version": "0.0.1",
+  "hash_algorithm": "sha256(sorted UTF-8 path + NUL + lowercase file sha256 + LF)",
+  "identity": {
+    "files": {
+      "modorch-config/Cargo.toml": "ac64d9635f40fe5d6ec37839d3ccab34585442d19a6a4e1469cd4619f861dad5",
+      "modorch-config/src/lib.rs": "98200e14a580b7e2e11038d979acd6d1409aa6e42ba218d7cb424497f20b5157",
+      "modorch-core/Cargo.toml": "068f2fc96c229303b159347d1d1f95d57babecbca58bfaabc6e51e1b7296f959",
+      "modorch-core/src/failure.rs": "9c0fb1db88e0c5ec304520ad583714d39e77cf03d0384801837775e943a99671",
+      "modorch-core/src/lib.rs": "b527b8be9036a59460652bcf70b2579948621060c1e9b3b47b446a0694168f5c",
+      "modorch-core/src/operation.rs": "c2be751499dd21c727892b90f0dac8956587d3c9e1f711eaa8a27101b7ac65e7",
+      "modorch-eventhub/Cargo.toml": "c0bb9d348adc2ec3d90feb9b6273b75b9915dadfb2bdfb43bada889f7e17ebbc",
+      "modorch-eventhub/src/admission.rs": "07a0007bae7dd0a384e18b3935e06b53d40707b058e3184ed4fc27f4961a26be",
+      "modorch-eventhub/src/lanes.rs": "7ed73fac039bfd12d3d5eefd38574dfacf0e5d81044bacf402968f70eceacbf4",
+      "modorch-eventhub/src/lib.rs": "dc0ba199fe2990b30ad8831baccf0378840b95f92dbd4de553244376632cac3d",
+      "modorch-eventhub/src/limits.rs": "f3702f379f9207f3987fe4d68974422260ef48dbe4e2a342dfc921f2aa4fc984",
+      "modorch-eventhub/src/metrics.rs": "f1169b30a1ed51745bfc5ed8f4c5c01d72f3cd4448c67da26b36e5c4873edb9f",
+      "modorch-eventhub/src/request.rs": "336fa0c6a8771c9bcd2313570e86b191f1372f84da55bad07b6d53d1caf48526",
+      "modorch-eventhub/src/routing.rs": "c87feae637bbf2295b6aef17dc6b83b10a118b3f16139e2eb6c7fafe35cb7bfd",
+      "modorch-eventhub/src/types.rs": "e3d15b678511b0c52b75bade6910ea40d881837aede0734a4ed8c49a5ee3501e",
+      "modorch-eventhub/src/waitgraph.rs": "1f91caadca46ef7bb1a45475342fd6c8cc7f96ce87939cac9bb9f3438e46bfd2",
+      "modorch-eventhub/src/workers.rs": "047275044528c7c8c77de5468128944769b277de93c01b6046ab4bdb5fd9c7a4",
+      "modorch-observe/Cargo.toml": "3f4077684d7dc1dd0addb39cf723f23b38b843ae30ba634d8238eb529659b003",
+      "modorch-observe/src/lib.rs": "51b2b9c820e686e1ed2370624663dd6b99936124f2137d4e071394548266c5fe",
+      "modorch-registry/Cargo.toml": "c8cf97ec3440af80b3cf48607b3934f674aaf357205aab295dc2e8ab27a6aaa6",
+      "modorch-registry/src/lib.rs": "a24485cc158b30f9bc663683c7579d1a3e8de6e3208cdc8a4a3fee4591af53fc",
+      "modorch-registry/src/services.rs": "655f93428826a7d3b3884c0a38afce94da9a5a8cce38473b1d5347ffce6446f6",
+      "modorch-runtime/Cargo.toml": "f53fc46daae8085f0b495f2627a176123bc08053beebbb74af7da37ad6651c9d",
+      "modorch-runtime/src/component.rs": "c336ee4955028087d42ec602712d5e311e9f13f490b5d0e03193d538bccabe54",
+      "modorch-runtime/src/lib.rs": "64e6a6fa06cf72f54461845ae8fb25258506db740b09e6b33f0c42a33c33335d",
+      "modorch-runtime/src/metrics.rs": "dd996d0d2f6986989d21e5296bddb2be6ce7c0ac92e9fdef7c0fa9a4faee1866",
+      "modorch-runtime/src/supervision.rs": "fa5f029b85d449fbddbe8b5f0de6baf2a3f2843ef906240fd47ac8d67a191902",
+      "modorch-scheduler/Cargo.toml": "b875c2c0575a3a06f7080720e65bac9a9567e06c4eb26a8a1060b05dfbd94763",
+      "modorch-scheduler/src/blocking.rs": "2ee15620c67879de4ffc488ab3fafdded7016592efb9d528bfa90675db4cc23b",
+      "modorch-scheduler/src/lib.rs": "9de82a625a96f91dbc15bfdf9b82944482283ad8bf5e3a90926f880eae44471a",
+      "modorch-scheduler/src/resource_metrics.rs": "2dde61d71be64a0fbeecaeaf7fdb820feac2cd47c6a59c74a7916b893fb2fbda",
+      "modorch/Cargo.toml": "a28a922f1a0c9ce5560b61e80796d133af18b88140913c63305dc01effb72b46",
+      "modorch/src/lib.rs": "cf1077fc87452ed8ceca8efcd6066ccd46b41c65ea07d93ce146049ef433d5e4"
+    },
+    "sha256": "ba0dbeabab31900cfe8740db6ae03aa282cef17f81fc7b432269851df9410068"
+  },
+  "required_features": [
+    "runtime"
+  ],
+  "skill_revision": "1.0.3"
+}

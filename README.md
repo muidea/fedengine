@@ -1,1 +1,59 @@
-# fedengine
+# FedEngine
+
+基于 [详细设计 v1.1](docs/FedEngine_详细设计文档_v1.1.md) 的 Rust 联邦 SQL 服务。使用 Modorch-RS 管理组件、PGWire 提供 PostgreSQL 协议子集，DuckDB 负责本地计算及 PostgreSQL/MySQL 远端访问。
+
+## 本地启动
+
+需要 Rust 1.94.0（由 `rust-toolchain.toml` 固定）、C/C++ 运行库，以及同级目录的 `modorch-rs`（真实 Facade 版本 0.0.1）。准确依赖和指纹见 [开发说明](docs/development.md)。
+
+```sh
+cargo check --workspace --locked
+cargo run --locked -- --check-config
+export FEDENGINE_PASSWORD='replace-with-a-local-password'
+cargo run --locked -- --config config/application.toml
+```
+
+开发配置监听 `127.0.0.1:15432`，用户为 `fedengine`，未接入远端源；可通过 PostgreSQL 协议执行 `SELECT 1`。退出使用 SIGINT/SIGTERM。生产配置须提供 TLS 证书、私钥并设置 `tls_required=true`。
+
+## 接入数据源
+
+```sh
+python3 scripts/fetch-extensions.py --dest data/extensions
+```
+
+以 `examples/config/federation.toml` 为模板，将脚本输出的绝对路径配置为 `[duckdb].extension_directory`，通过环境变量设置 `FEDENGINE_POSTGRES_DSN`、`FEDENGINE_MYSQL_DSN`。源连接串只从 SecretRef 读取，不能写入 SQL 或提交到版本库。远端账号应限制实际对象权限。
+
+`config/application.toml` 是默认启动配置，`examples/config/federation.toml` 是独立的联邦配置示例。每次启动加载一份完整配置，不会合并这两个文件。准备好扩展和上述环境变量后，从仓库根目录运行：
+
+```sh
+cargo run --locked -- --config examples/config/federation.toml
+```
+
+配置中的相对路径以进程工作目录为基准。
+
+显式配置源、namespace allowlist、对象 grants 后才允许访问。DDL 还要求精确版本与验收证据对应的 `[[capabilities]]`；示例默认没有能力记录，因此不会提前开放 DDL。
+
+```sql
+SELECT a.id, b.amount
+FROM pg_crm.public.customers a
+JOIN mysql_erp.erp.orders b ON a.id=b.customer_id;
+```
+
+跨源 SELECT/JOIN 可用；写入和 DDL 必须完整绑定到一个已注册的 DataSourceId。显式事务、COPY、业务 SQL 中的 ATTACH/LOAD/CALL、任意文件和外部函数默认拒绝。
+
+## 验证与文档
+
+```sh
+cargo test --workspace --locked
+scripts/test-federation.sh
+```
+
+第二条命令仅使用专用一次性 PostgreSQL/MySQL 容器，结束后删除这些容器及卷。需要 Docker、Compose、curl 与网络。不要把测试 DSN 指向业务数据库。
+
+- [架构与生命周期](docs/architecture.md)
+- [SQL 能力](docs/sql-capability.md)、[DDL 能力门禁](docs/ddl-capability-matrix.md)
+- [协议与类型兼容](docs/protocol-compatibility.md)
+- [开发、部署和 skill-hub](docs/development.md)
+- [Git 提交与本地文件分类](docs/git-submission.md)
+
+当前为开发实现。完整 JDBC/psql 兼容、长时负载、源库故障注入等尚未验收；具体边界以能力文档和实际测试证据为准。

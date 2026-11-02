@@ -1,0 +1,78 @@
+# Standalone federation example. Run from the repository root:
+# cargo run --locked -- --config examples/config/federation.toml
+# Relative paths below resolve from the process working directory.
+# Production must configure TLS certificate/key and tls_required=true.
+[application]
+name = "fedengine"
+[pgwire]
+listen = "127.0.0.1:15432"
+max_connections = 256
+startup_timeout_ms = 10000
+query_timeout_ms = 60000
+output_timeout_ms = 10000
+tls_required = false
+max_statements = 128
+max_portals = 64
+[duckdb]
+database_path = ":memory:"
+max_workers = 8
+threads = 4
+memory_limit = "1GB"
+temp_directory = "./data/tmp"
+result_channel_batches = 8
+batch_rows = 512
+acquire_timeout_ms = 5000
+install_extensions = false
+extension_directory = "./data/extensions"
+pool_max_connections = 16
+pool_wait_timeout_ms = 30000
+[ddl]
+enabled = true
+allow_drop_schema = false
+source_lock_timeout_ms = 30000
+[shutdown]
+grace_period_secs = 30
+[[users]]
+name = "fedengine"
+password_secret_ref = "FEDENGINE_PASSWORD"
+
+[[datasources]]
+id = "crm"
+kind = "postgres"
+catalog_alias = "pg_crm"
+secret_ref = "FEDENGINE_POSTGRES_DSN"
+default_schema = "public"
+read_only = false
+ddl_enabled = true
+allowed_schemas = ["public", "sales"]
+[[datasources]]
+id = "erp"
+kind = "mysql"
+catalog_alias = "mysql_erp"
+secret_ref = "FEDENGINE_MYSQL_DSN"
+default_schema = "erp"
+read_only = false
+ddl_enabled = true
+allowed_schemas = ["erp"]
+[[grants]]
+principal = "fedengine"
+source = "crm"
+schema = "*"
+object = "*"
+actions = ["SELECT", "INSERT", "UPDATE", "DELETE", "CREATE_SCHEMA", "DROP_SCHEMA", "CREATE_TABLE", "CREATE_TABLE_AS", "ALTER_TABLE", "DROP_TABLE", "CREATE_INDEX", "DROP_INDEX"]
+[[grants]]
+principal = "fedengine"
+source = "erp"
+schema = "*"
+object = "*"
+actions = ["SELECT", "INSERT", "UPDATE", "DELETE", "CREATE_TABLE", "ALTER_TABLE", "DROP_TABLE", "CREATE_INDEX", "DROP_INDEX"]
+# DDL remains disabled for each source until a tested capability record is added.
+# [[capabilities]]
+# source = "crm"
+# duckdb_version = "v2.0.0"
+# extension_version = "<exact SELECT extension_version FROM duckdb_extensions()>"
+# remote_version = "<exact server_version>"
+# evidence = "<path to successful disposable-database integration report>"
+# ALTER requires its exact tested sub-operation, e.g. ALTER_TABLE_ADD_COLUMN.
+# operations = ["CREATE_SCHEMA", "CREATE_TABLE", "ALTER_TABLE", "DROP_TABLE", "CREATE_INDEX", "CREATE_INDEX_BTREE", "DROP_INDEX"]
+# index_adapter = true

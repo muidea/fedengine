@@ -1,0 +1,22 @@
+[package]
+name = "fedengine-pgwire"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+fedengine-core.workspace = true
+fedengine-contract.workspace = true
+fedengine-ddl.workspace = true
+fedengine-pg-compat.workspace = true
+pgwire.workspace = true
+modorch.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+futures.workspace = true
+bytes.workspace = true
+rustls-pemfile.workspace = true
+tokio-rustls.workspace = true
+rand.workspace = true

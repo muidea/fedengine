@@ -1,0 +1,15 @@
+[package]
+name = "fedengine-pg-compat"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+fedengine-core.workspace = true
+fedengine-contract.workspace = true
+pgwire.workspace = true
+bytes.workspace = true
+chrono.workspace = true
+uuid.workspace = true

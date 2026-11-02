@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:17.7-alpine
+    environment:
+      POSTGRES_USER: fedengine
+      POSTGRES_PASSWORD: fedengine-test-only
+      POSTGRES_DB: crm
+    ports:
+      - "127.0.0.1:25432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U fedengine -d crm"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  mysql:
+    image: mysql:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: fedengine-test-only
+      MYSQL_DATABASE: erp
+    ports:
+      - "127.0.0.1:23306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "--protocol=TCP", "-h", "127.0.0.1", "-pfedengine-test-only"]
+      interval: 2s
+      timeout: 3s
+      retries: 60

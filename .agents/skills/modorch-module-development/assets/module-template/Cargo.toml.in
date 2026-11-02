@@ -1,0 +1,12 @@
+[package]
+name = "modorch-modular-template"
+version = "0.0.1"
+edition = "2024"
+rust-version = "1.85"
+publish = false
+
+[workspace]
+
+[dependencies]
+modorch = { path = "__MODORCH_PATH__", features = ["config-toml"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
