@@ -51,6 +51,7 @@ scripts/test-federation.sh
 第二条命令仅使用专用一次性 PostgreSQL/MySQL 容器，结束后删除这些容器及卷。需要 Docker、Compose、curl 与网络。不要把测试 DSN 指向业务数据库。
 
 - [架构与生命周期](docs/architecture.md)
+- [数据源与 Schema 在线管理方案（待实施）](docs/datasource-management.md)
 - [SQL 能力](docs/sql-capability.md)、[DDL 能力门禁](docs/ddl-capability-matrix.md)
 - [协议与类型兼容](docs/protocol-compatibility.md)
 - [开发、部署和 skill-hub](docs/development.md)
