@@ -66,6 +66,13 @@ jobs:
           components: rustfmt, clippy
       - name: Check formatting
         run: cargo fmt --all -- --check
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check management JavaScript
+        run: |
+          node --check crates/fedengine-management/web/app.js
+          node --check scripts/web-smoke.mjs
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: fedengine -> target
@@ -90,6 +97,8 @@ jobs:
       - name: Binary smoke
         # Root integration tests cause cargo test to build target/debug/fedengine.
         run: python3 scripts/smoke.py
+      - name: Management browser smoke
+        run: node scripts/web-smoke.mjs --chrome "$(command -v google-chrome)"
       - name: Rustdoc
         if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.rustdoc == 'true'
         env:

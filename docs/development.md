@@ -91,7 +91,7 @@ Actions 在 PR、`master` 分支 push 和手动触发时执行。普通分支 pu
 | 改动 / 触发方式 | 执行内容 |
 |---|---|
 | 仅 `README.md`、`LICENSE`、`docs/**/*.md` | 跳过 Rust 构建和数据库集成，完成最终 `check` |
-| 其他路径，包括代码、配置、示例、依赖、脚本、skill、CI，以及未知新路径 | fmt、依赖准备、框架指纹、Clippy、workspace 测试、真实进程 smoke、一次性数据库联邦集成 |
+| 其他路径，包括代码、配置、示例、依赖、脚本、skill、CI，以及未知新路径 | fmt、JavaScript 语法、依赖准备、框架指纹、Clippy、workspace 测试、真实进程及 Web 浏览器 smoke、一次性数据库联邦集成 |
 | 上述验证中的 Rust 源码、包清单、锁文件、工具链、Cargo 设置、skill 或 CI 变更 | 额外执行 Rustdoc，警告视为错误；保守覆盖公共 API 文档变更 |
 | `master` 上的非纯文档变更 | 完整验证，包含 Rustdoc |
 | 手动触发 | 无论改动范围如何都执行完整验证 |
@@ -101,6 +101,22 @@ CI 删除独立 `cargo check`，由同范围的 Clippy 完成编译检查。根�
 Cargo 依赖及编译产物通过 Rust cache 复用，key 包含固定的 Modorch revision；DuckDB 原生库和扩展通过单独缓存复用，key 包含 runner 平台、架构、Cargo.lock 和扩展下载脚本。扩展脚本在命中缓存后仍校验 manifest 与文件 SHA256。只有 `master` 运行保存缓存，PR 使用缓存并在缺失时正常下载和构建。
 
 恢复缓存后先执行 `cargo fetch --locked`，再执行离线指纹预检，保证冷缓存也能工作。格式检查放在缓存恢复和依赖下载之前，以便尽早失败。未增加构建矩阵或将 Rust 检查拆成多个重复编译的 job；实际节省时间以 Actions 分步耗时为准。
+
+## Web 管理端验证
+
+静态页面位于 `crates/fedengine-management/web/`，由 `fedengine-management/src/web.rs` 编译嵌入，通过原有受管 HTTP 监听提供。修改静态资源后需要重新构建二进制，不依赖 npm 或外部 CDN。
+
+`tests/management.rs` 验证页面与静态资源可达、响应策略、未知路径及浏览器同源写边界。浏览器回归使用 Node.js 22 及以上版本的标准库和本机 Chromium，不安装 npm 依赖：
+
+```sh
+cargo build --locked
+node --check crates/fedengine-management/web/app.js
+node scripts/web-smoke.mjs --chrome /opt/google/chrome/chrome
+```
+
+脚本启动独立临时状态库、随机端口和专用无头浏览器，验证登记、异步状态、失败探测、凭据引用与 Schema 配置、过期表单冲突、响应丢失后的原键重试、业务虚拟库完整映射编辑和删除、源停用/删除、操作记录及窄屏布局。JavaScript 语法检查及默认浏览器回归已接入 CI，使用 Node.js 22 和 runner 预置 Chrome。目录分页、快照冲突和不可信名称渲染使用浏览器层合成 HTTP 响应，不能替代真实远端目录采集验收。可通过 `FEDENGINE_WEB_POSTGRES_DSN` 和 `FEDENGINE_WEB_POSTGRES_SCHEMA` 显式指定含表的 PostgreSQL schema，额外验证只读探测、发现、激活、刷新及实际目录展示；需事先准备匹配扩展，脚本不执行远端业务 DDL。
+
+可选 `--binary` 指定构建程序，`--screenshot /tmp/页面.png` 生成临时检查截图。服务日志、状态库和浏览器配置退出时清理，截图由调用者验证后删除，不归档。
 
 ## 容器
 

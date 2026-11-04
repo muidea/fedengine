@@ -121,6 +121,94 @@ fn target(source: &Value) -> Value {
     json!({"incarnation":source["incarnation"],"expected_revision":source["desired_revision"]})
 }
 
+async fn browser_http(
+    address: SocketAddr,
+    method: &str,
+    path: &str,
+    headers: &str,
+    body: &str,
+) -> (u16, String, String) {
+    let mut socket = TcpStream::connect(address).await.unwrap();
+    let request = format!(
+        "{method} {path} HTTP/1.1\r\nHost: {address}\r\nConnection: close\r\n{headers}Content-Length: {}\r\n\r\n{body}",
+        body.len()
+    );
+    socket.write_all(request.as_bytes()).await.unwrap();
+    let mut response = Vec::new();
+    tokio::time::timeout(Duration::from_secs(15), socket.read_to_end(&mut response))
+        .await
+        .unwrap()
+        .unwrap();
+    let response = String::from_utf8(response).unwrap();
+    let (head, body) = response.split_once("\r\n\r\n").unwrap();
+    let status = head.split_whitespace().nth(1).unwrap().parse().unwrap();
+    (status, head.to_ascii_lowercase(), body.into())
+}
+
+#[tokio::test]
+async fn embedded_web_assets_and_browser_origin_boundary() {
+    let temporary = TestDirectory::new();
+    let engine = FedEngine::start(configuration(&temporary)).await.unwrap();
+    let address = engine.management_address().unwrap();
+    for path in ["/", "/manage", "/manage/"] {
+        let (status, headers, body) = browser_http(address, "GET", path, "", "").await;
+        assert_eq!(status, 200);
+        assert!(headers.contains("content-type: text/html; charset=utf-8"));
+        assert!(headers.contains("cache-control: no-store"));
+        assert!(headers.contains("frame-ancestors 'none'"));
+        assert!(headers.contains("x-content-type-options: nosniff"));
+        assert!(body.contains("lang=\"zh-CN\""));
+        assert!(body.contains("/manage/app.js"));
+    }
+    for (path, content_type) in [
+        ("/manage/app.js", "text/javascript"),
+        ("/manage/style.css", "text/css"),
+    ] {
+        let (status, headers, body) = browser_http(address, "GET", path, "", "").await;
+        assert_eq!(status, 200);
+        assert!(headers.contains(content_type));
+        assert!(!body.is_empty());
+    }
+    assert_eq!(
+        browser_http(address, "GET", "/manage/secrets/credentials", "", "")
+            .await
+            .0,
+        404
+    );
+    let body = definition().to_string();
+    for origin in ["http://untrusted.example", "http://127.0.0.1:1", "null"] {
+        let headers = format!(
+            "Origin: {origin}\r\nContent-Type: application/json\r\nIdempotency-Key: browser-register\r\n"
+        );
+        assert_eq!(
+            browser_http(address, "POST", "/api/v1/sources", &headers, &body)
+                .await
+                .0,
+            403
+        );
+    }
+    let cross_site = format!(
+        "Origin: http://{address}\r\nSec-Fetch-Site: cross-site\r\nIdempotency-Key: browser-register\r\n"
+    );
+    assert_eq!(
+        browser_http(address, "POST", "/api/v1/sources", &cross_site, &body)
+            .await
+            .0,
+        403
+    );
+    assert_eq!(get(address, "sources").await, json!([]));
+    let same_origin = format!(
+        "Origin: http://{address}\r\nSec-Fetch-Site: same-origin\r\nContent-Type: application/json\r\nIdempotency-Key: browser-register\r\n"
+    );
+    let (status, _, accepted) =
+        browser_http(address, "POST", "/api/v1/sources", &same_origin, &body).await;
+    assert_eq!(status, 202, "{accepted}");
+    let operation = finish(address, &serde_json::from_str(&accepted).unwrap()).await;
+    assert_eq!(operation["status"], "Succeeded");
+    assert_eq!(get(address, "sources/online").await["status"], "Registered");
+    engine.shutdown_until_drained().await.unwrap();
+}
+
 #[tokio::test]
 async fn registration_versions_idempotency_and_deletion_survive_restart_without_reimport() {
     let temporary = TestDirectory::new();

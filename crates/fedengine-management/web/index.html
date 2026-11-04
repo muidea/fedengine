@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>FedEngine · 数据源管理</title>
+  <link rel="stylesheet" href="/manage/style.css">
+  <script type="module" src="/manage/app.js"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="/manage/"><span class="brand-mark">F</span><span>FedEngine<small>管理控制台</small></span></a>
+    <div class="nav-label">工作空间</div>
+    <nav aria-label="主导航">
+      <button type="button" data-page="sources" class="nav active"><span>▤</span>数据源<span id="source-count" class="nav-count">0</span></button>
+      <button type="button" data-page="databases" class="nav"><span>▦</span>业务虚拟库</button>
+      <button type="button" data-page="operations" class="nav"><span>◷</span>操作记录</button>
+    </nav>
+    <div class="sidebar-bottom"><span class="live-dot"></span>内置管理端<small>与管理 API 共用可信访问边界</small></div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar"><span>工作空间 <span class="separator">/</span> <strong id="breadcrumb">数据源</strong></span><span id="connection" role="status">正在连接…</span></header>
+    <main id="main" tabindex="-1">
+      <div class="page-heading"><div><div class="eyebrow">DATA WORKSPACE</div><h1 id="page-title">数据源</h1><p id="page-description">统一管理远端连接、元数据与业务访问入口。</p></div><div id="page-actions" class="actions"></div></div>
+      <div id="pending" class="notice warning" hidden></div>
+      <section id="stats" class="stats" aria-label="管理概览"></section>
+      <div id="content" aria-live="polite"><div class="empty">正在读取管理状态…</div></div>
+    </main>
+    <footer>FedEngine <span>PostgreSQL 协议 · 在线数据源管理</span></footer>
+  </div>
+  <div id="toast" role="status" hidden></div>
+  <dialog id="dialog" aria-labelledby="dialog-title"><form id="editor"><div class="dialog-heading"><div><div class="eyebrow">MANAGEMENT</div><h2 id="dialog-title"></h2></div><button type="button" id="close-dialog" class="icon-button" aria-label="关闭">×</button></div><div id="dialog-body"></div><p id="dialog-error" class="form-error" role="alert" hidden></p><div class="dialog-footer"><button type="button" id="cancel-dialog">取消</button><button type="submit" id="submit-dialog" class="primary">提交</button></div></form></dialog>
+  <noscript>请启用 JavaScript 以使用管理端；也可直接调用 /api/v1 管理 API。</noscript>
+</body>
+</html>

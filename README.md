@@ -29,7 +29,7 @@ python3 scripts/fetch-extensions.py --dest data/extensions
 cargo run --locked -- --config examples/config/federation.toml
 ```
 
-配置中的相对路径以进程工作目录为基准。`[[datasources]]` 仅作首次导入；后续启动以管理库为准，不覆盖在线修改。登记、发现、Schema 选择、激活、刷新及停用示例见[管理 API](docs/management-api.md)。
+配置中的相对路径以进程工作目录为基准。`[[datasources]]` 仅作首次导入；后续启动以管理库为准，不覆盖在线修改。启用管理服务后，在浏览器打开 `http://127.0.0.1:15433/manage/` 使用内置轻量 Web 管理端，无需独立前端服务或构建步骤。登记、发现、Schema 选择、激活、刷新及停用示例见[管理 API](docs/management-api.md)。
 
 显式配置源、namespace allowlist、对象 grants 后才允许访问。DDL 还要求精确版本与验收证据对应的 `[[capabilities]]`；示例默认没有能力记录，因此不会提前开放 DDL。
 

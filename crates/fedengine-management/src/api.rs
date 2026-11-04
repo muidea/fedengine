@@ -4,7 +4,7 @@ use axum::{
     extract::{DefaultBodyLimit, State},
     http::{HeaderMap, Method, StatusCode, Uri},
     response::{IntoResponse, Response},
-    routing::any,
+    routing::{any, get},
 };
 use fedengine_contract::*;
 use fedengine_core::*;
@@ -92,6 +92,11 @@ impl Initiator for ApiInitiator {
             timeout: Duration::from_millis(self.config.management.request_timeout_ms),
         };
         let router = Router::new()
+            .route("/", get(crate::web::index))
+            .route("/manage", get(crate::web::index))
+            .route("/manage/", get(crate::web::index))
+            .route("/manage/app.js", get(crate::web::javascript))
+            .route("/manage/style.css", get(crate::web::stylesheet))
             .route("/api/v1/{*path}", any(dispatch))
             .layer(DefaultBodyLimit::max(65_536))
             .with_state(state);
@@ -117,6 +122,13 @@ async fn dispatch(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
+    if method != Method::GET && method != Method::HEAD && !crate::web::same_origin(&headers) {
+        return (
+            StatusCode::FORBIDDEN,
+            axum::Json(json!({"error":"cross-origin management writes are not allowed"})),
+        )
+            .into_response();
+    }
     let (request, writing) = match decode(&method, &uri, &headers, &body) {
         Ok(request) => request,
         Err(error) => return error_response(error),
