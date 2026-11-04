@@ -104,6 +104,7 @@ impl QueryHandler {
         if r.cancel.is_cancelled() {
             return Err(EngineError::new("57014", "query canceled before admission"));
         }
+        let admission_started = std::time::Instant::now();
         let registry = self.registry.acquire().map_err(message_error)?;
         // Instance lease precedes source fences and is transferred to the actual worker.
         let instance = tokio::time::timeout(remaining(r)?, registry.instance.clone().read_owned())
@@ -122,6 +123,14 @@ impl QueryHandler {
             .wait(remaining(r)?)
             .await
             .map_err(message_error)?;
+        if admission_started.elapsed() > Duration::from_millis(200) {
+            // Includes waiting for the instance barrier and committed catalog heads.
+            // Never include SQL or credentials in this diagnostic.
+            tracing::debug!(
+                elapsed_ms = admission_started.elapsed().as_secs_f64() * 1000.,
+                "query catalog admission delayed"
+            );
+        }
         let headers = match headers.as_ref() {
             Ok(CatalogReply::Headers(headers)) => headers.clone(),
             Err(error) => return Err(error.clone()),
@@ -243,13 +252,14 @@ impl QueryHandler {
             sources: definitions.clone(),
             indexes: vec![],
         };
-        let mut relations = std::collections::BTreeSet::new();
+        let mut relations = fedengine_ddl::RelationNames::default();
         let mut bindings = std::collections::BTreeMap::new();
         for catalog in scope
             .catalogs
             .iter()
             .filter(|c| c.catalog == r.session.database)
         {
+            let names_started = std::time::Instant::now();
             let names = ctx
                 .event_hub
                 .request::<_, Result<CatalogReply>>(
@@ -262,8 +272,14 @@ impl QueryHandler {
                 .wait(remaining(r)?)
                 .await
                 .map_err(message_error)?;
+            if names_started.elapsed() > Duration::from_millis(200) {
+                tracing::debug!(
+                    elapsed_ms = names_started.elapsed().as_secs_f64() * 1000.,
+                    "query relation name resolution delayed"
+                );
+            }
             match names.as_ref() {
-                Ok(CatalogReply::Names(names)) => relations.extend(names.clone()),
+                Ok(CatalogReply::Names(names)) => relations.extend_shared(names.clone()),
                 Err(e) => return Err(e.clone()),
                 _ => return Err(EngineError::new("XX000", "invalid catalog names reply")),
             }

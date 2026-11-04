@@ -35,6 +35,9 @@ listen = "127.0.0.1:15433"
 credentials_directory = "./secrets"
 queue_capacity = 64
 max_concurrent_operations = 2
+# Reserve before collection; the isolated DuckDB limit is half, capped at 128MiB.
+metadata_memory_budget_mb = 512
+metadata_operation_memory_mb = 256
 drain_timeout_ms = 30000
 request_timeout_ms = 10000
 [ddl]

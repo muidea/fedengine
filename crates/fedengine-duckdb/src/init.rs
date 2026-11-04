@@ -54,6 +54,17 @@ impl Lifecycle for DuckdbInitiator {
             .spawn_blocking_io(move |_| {
                 let _instance = instance;
                 let conn = setup_root.lock().unwrap();
+                // Explicitly provisioned extensions can be verified and initialized
+                // before admitting PG sessions, avoiding first-use LOAD in a live barrier.
+                if let Some(directory) = &config.duckdb.extension_directory {
+                    for kind in [DataSourceKind::Postgres, DataSourceKind::Mysql] {
+                        if crate::extensions::provisioned(directory, kind.extension())
+                            .map_err(fw)?
+                        {
+                            crate::control::load_extension(&conn, &config, kind).map_err(fw)?;
+                        }
+                    }
+                }
                 if config.management.enabled {
                     crate::control::recover(&conn, &config, &registry).map_err(fw)?;
                 } else {

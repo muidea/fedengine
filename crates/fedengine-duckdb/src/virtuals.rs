@@ -380,6 +380,8 @@ pub(super) fn publish(conn: &Connection, state: &ManagementState) -> Result<()> 
                     &db,
                     [(binding.config.name.clone(), binding.oid)].into(),
                 );
+                let epoch = format!("virtual-schema:{}", binding.oid);
+                let mut oids = identity::OidBatch::load(conn, std::slice::from_ref(&epoch))?;
                 for remote in source_snapshot
                     .objects
                     .iter()
@@ -392,9 +394,8 @@ pub(super) fn publish(conn: &Connection, state: &ManagementState) -> Result<()> 
                     // source scan counters do not describe these virtual relations.
                     object.metadata.storage = RelationStorage::default();
                     object.metadata.activity = RelationActivity::default();
-                    object.metadata.oid = identity::oid(
-                        conn,
-                        &format!("virtual-schema:{}", binding.oid),
+                    object.metadata.oid = oids.oid(
+                        &epoch,
                         &[
                             &source_snapshot.incarnation,
                             &remote.metadata.oid.to_string(),
@@ -419,9 +420,10 @@ pub(super) fn publish(conn: &Connection, state: &ManagementState) -> Result<()> 
                     &snapshot,
                     &db.config.name,
                     &binding.config.name,
-                    identity::oid(conn, &epoch, &["wrapper"])?,
-                    identity::oid(conn, &epoch, &["server"])?,
+                    oids.oid(&epoch, &["wrapper"])?,
+                    oids.oid(&epoch, &["server"])?,
                 )?;
+                oids.flush()?;
             }
             keep.insert(id.clone());
             db.schemas[index].snapshot_id = Some(id);

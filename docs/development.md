@@ -72,13 +72,15 @@ scripts/test-federation.sh
 
 验证产生的执行日志、临时验收报告、截图和运行环境快照不提交、不归档，完成验证后清理；运行期间使用被忽略的 `docs/validation/` 或仓库外临时目录。长期维护的客户端查询/预期结果位于 `tests/fixtures/metadata/`，能力边界维护在[协议兼容说明](protocol-compatibility.md)和[管理 API](management-api.md)中。
 
-扩展通过 HTTPS 下载官方 `postgres_scanner`、`mysql_scanner`，保存核心版本、平台、来源 URL 和 SHA256；运行时核对清单与文件，并保留 DuckDB 签名验证。业务 SQL 无法 INSTALL/LOAD，生产推荐预置离线扩展，`install_extensions=false`。升级核心/扩展/源版本后须重验对应能力矩阵。
+扩展通过 HTTPS 下载官方 `postgres_scanner`、`mysql_scanner`，保存核心版本、平台、来源 URL 和 SHA256；运行时在首次加载时以固定缓冲流式核对清单与文件，并保留 DuckDB 签名验证；已加载到同一实例的扩展不重复读盘校验。预置清单中的受支持扩展在开放会话前加载。业务 SQL 无法 INSTALL/LOAD，生产推荐预置离线扩展，`install_extensions=false`。升级核心/扩展/源版本后须重验对应能力矩阵。
 
 ## 规模与故障验证边界
 
-当前元数据采集和发布仍可能长时间持有全实例屏障；万表规模下存在无关查询超时及内存增长问题，规模与隔离性能尚未达标。远端采集、身份批处理和屏障范围仍需优化，同时保持原子发布、稳定身份和真实租约语义。DuckDB 的 memory_limit 不覆盖全部 Rust 元数据内存，RSS 需独立预算。
+远端目录采集在独立 DuckDB 实例进行，本地批量身份分配与目录投影在不可见事务内准备，最终屏障只覆盖版本复核、提交及运行注册表切换。正式挂载与缓存清理仍有独立的排空窗口；长事务/悬停 Portal 可推迟管理操作完成，但等待操作不应阻挡新查询。锁顺序、资源预算与失败语义见[管理 API](management-api.md#目录刷新与资源预算)。
 
-完整资源、网络、存储和进程强杀故障矩阵，以及 24 小时耐久验证仍未完成。单次目录发布成功或本地投影耗时不能代替全链路容量验证。后续工作见[剩余项方案](remaining-items-plan.md)。
+规模验收必须同时记录采集、类型探测、身份处理、投影、准备、正式挂载和最终屏障耗时，以及并发查询 p99、最大停顿与进程 RSS。DuckDB memory_limit 和采集字节预算不能替代进程内存测量。连续刷新应观察到内存稳定平台；不要求分配器每轮立即归还全部 RSS。
+
+完整资源、网络、存储和进程强杀故障矩阵，以及 24 小时耐久验证仍需专项执行。单次目录发布成功或本地投影耗时不能代替全链路容量验证。后续工作见[剩余项方案](remaining-items-plan.md)。
 
 ## CI 执行策略
 
@@ -124,3 +126,17 @@ FEDENGINE_BENCH_OBJECTS=10000 cargo test -p fedengine-duckdb catalog_scale_basel
 该基线只测本地 synthetic 投影；每表一列，不包含远端扫描、远端请求、生产写锁竞争或业务负载影响。实际扫描还需要每对象一次扩展 DESCRIBE，不能据此推断远端请求数恒定。
 
 隔离数据库验证默认使用 25432/23306；端口已占用时可设置 FEDENGINE_TEST_POSTGRES_PORT/FEDENGINE_TEST_MYSQL_PORT，例如 35432/33306。脚本只管理 fedengine-test 项目的临时容器，并在启动失败或测试退出时清理。
+
+### 真实远端规模回归
+
+规模验收使用 release 构建，常规功能回归仍使用默认测试构建。在专用一次性 PostgreSQL 容器上设置 `FEDENGINE_POSTGRES_DSN`，先准备锁定扩展，再单独执行以下用例。它创建独立测试 schema 和临时管理库，检查首次激活、连续刷新、映射目录、对象身份、并发无关及同源查询、RSS 平台及受管任务排空；不要指向业务数据库。测试失败时也应销毁一次性容器及卷。
+
+```sh
+python3 scripts/fetch-extensions.py --dest data/extensions
+FEDENGINE_SCALE_OBJECTS=10000 FEDENGINE_SCALE_COLUMNS=1 FEDENGINE_SCALE_ROUNDS=10 \
+  cargo test --release --locked --test management metadata_scale_refresh -- --ignored --nocapture --test-threads=1
+FEDENGINE_SCALE_OBJECTS=10000 FEDENGINE_SCALE_COLUMNS=10 FEDENGINE_SCALE_ROUNDS=10 \
+  cargo test --release --locked --test management metadata_scale_refresh -- --ignored --nocapture --test-threads=1
+```
+
+输入限制为最多 10k 表/100k 列；正式实例使用 256MB DuckDB memory_limit，一列表场景操作额度为 256MiB，多列表场景在运行前固定为 512MiB（共享额度 512MiB，因此仅一项采集可运行）；独立采集实例的 DuckDB 内存上限为 128MiB。默认 RSS 上限为 1024MiB，可通过 `FEDENGINE_SCALE_RSS_MB` 显式调整，不能在失败后悄悄改变验收预算。用例断言查询无错误、最大停顿不超过 1 秒、p99 相比空载基线增加不超过 100ms、最后三轮 RSS 波动不超过 64MiB，并检查进程峰值预算。它使用闭环查询加 20ms 间隔，不代表开放环吞吐量或生产容量认证。正式屏障及各阶段耗时从 debug 日志单独核对；Apply 的正式挂载窗口与普通刷新分别评估。临时日志验证后清理，不归档。

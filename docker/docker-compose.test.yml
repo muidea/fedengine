@@ -1,6 +1,8 @@
 services:
   postgres:
     image: postgres:17.7-alpine
+    # A 10k-table schema must also be droppable in one transaction.
+    command: ["postgres", "-c", "max_locks_per_transaction=512"]
     environment:
       POSTGRES_USER: fedengine
       POSTGRES_PASSWORD: fedengine-test-only

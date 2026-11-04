@@ -1,22 +1,166 @@
 use crate::error::{engine_error, framework_error, fw};
-use duckdb::{Connection, OptionalExt, params};
+use duckdb::{Connection, OptionalExt, appender_params_from_iter, params};
 use fedengine_contract::*;
 use fedengine_core::*;
 use modorch::prelude::*;
 use serde::{Serialize, de::DeserializeOwned};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet, VecDeque},
     sync::{Arc, Mutex},
 };
 use tokio::sync::Mutex as AsyncMutex;
+
+type SnapshotNames = Arc<BTreeSet<(String, String)>>;
+// Persist bounded object facts independently from the directory's filter keys.
+// Compression is prepared before publication, avoiding large JSON WAL/checkpoint work.
+fn encode_object(id: &str, object: &CatalogObject) -> Result<Vec<u8>> {
+    let mut encoder = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::fast());
+    {
+        use std::io::Write;
+        let mut buffered = std::io::BufWriter::new(&mut encoder);
+        serde_json::to_writer(&mut buffered, &(id, object)).map_err(|_| storage_error())?;
+        buffered.flush().map_err(|_| storage_error())?;
+    }
+    encoder.finish().map_err(|_| storage_error())
+}
+fn decode_object(payload: &[u8]) -> Result<(String, CatalogObject)> {
+    use std::io::Read;
+    let reader = flate2::read::ZlibDecoder::new(payload).take(512 * 1024 * 1024 + 1);
+    serde_json::from_reader(std::io::BufReader::new(reader)).map_err(|_| storage_error())
+}
+
+#[derive(Default)]
+pub(super) struct CatalogViews {
+    heads: Option<CatalogHeads>,
+    names: VecDeque<(String, SnapshotNames)>,
+    count: usize,
+}
+impl CatalogViews {
+    fn names(&self, id: &str) -> Option<Arc<BTreeSet<(String, String)>>> {
+        self.names
+            .iter()
+            .find(|(key, _)| key == id)
+            .map(|(_, names)| names.clone())
+    }
+    fn insert(&mut self, id: String, names: Arc<BTreeSet<(String, String)>>) {
+        if names.len() > 100_000 || self.names(&id).is_some() {
+            return;
+        }
+        while self.names.len() >= 16 || self.count + names.len() > 100_000 {
+            if let Some((_, old)) = self.names.pop_front() {
+                self.count -= old.len();
+            }
+        }
+        self.count += names.len();
+        self.names.push_back((id, names));
+    }
+}
+fn snapshot_ids(heads: &CatalogHeads) -> BTreeSet<String> {
+    heads
+        .sources
+        .iter()
+        .filter_map(|h| h.snapshot.as_ref().map(|s| s.id.clone()))
+        .chain(
+            heads
+                .databases
+                .iter()
+                .flat_map(|d| d.schemas.iter().filter_map(|s| s.snapshot_id.clone())),
+        )
+        .collect()
+}
+fn relation_names(conn: &Connection, snapshot: &str) -> Result<BTreeSet<(String, String)>> {
+    let mut stmt=conn.prepare("SELECT _schema,relname FROM _fedengine.meta_pg_class WHERE _snapshot_id=? AND relkind IN ('r','v','m','f','p') LIMIT 100001").map_err(engine_error)?;
+    let mut rows = stmt.query([snapshot]).map_err(engine_error)?;
+    let mut names = BTreeSet::new();
+    while let Some(row) = rows.next().map_err(engine_error)? {
+        names.insert((
+            row.get(0).map_err(engine_error)?,
+            row.get(1).map_err(engine_error)?,
+        ));
+    }
+    if names.len() > 100000 {
+        return Err(EngineError::new("54000", "catalog name budget exceeded"));
+    }
+    Ok(names)
+}
 
 pub(super) struct DuckdbStore {
     pub root: Arc<Mutex<Connection>>,
     pub tasks: TaskScheduler,
     pub writer: Arc<AsyncMutex<()>>,
+    pub views: Arc<Mutex<CatalogViews>>,
 }
 #[async_trait]
 impl ManagementStore for DuckdbStore {
+    async fn prepare_publication(
+        &self,
+        incarnation: String,
+        update: ManagementUpdate,
+        ownership: Box<dyn Send>,
+    ) -> Result<Box<dyn PreparedPublication>> {
+        let writer = self.writer.clone().lock_owned().await;
+        let root = self.root.clone();
+        let tasks = self.tasks.clone();
+        let started = std::time::Instant::now();
+        let views = self.views.clone();
+        self.tasks
+            .spawn_blocking_io(move |_| {
+                let conn = root
+                    .lock()
+                    .unwrap()
+                    .try_clone()
+                    .map_err(engine_error)
+                    .map_err(fw)?;
+                Ok((|| -> Result<Box<dyn PreparedPublication>> {
+                    conn.execute_batch("BEGIN TRANSACTION")
+                        .map_err(engine_error)?;
+                    let result = prepare_changes(&conn, &incarnation, update);
+                    if let Err(error) = result {
+                        let _ = conn.execute_batch("ROLLBACK");
+                        return Err(error);
+                    }
+                    tracing::debug!(
+                        elapsed_ms = started.elapsed().as_secs_f64() * 1000.,
+                        "management publication preparation finished"
+                    );
+                    let heads = effective_heads(&conn)?;
+                    let old_ids = views
+                        .lock()
+                        .unwrap()
+                        .heads
+                        .as_ref()
+                        .map(snapshot_ids)
+                        .unwrap_or_default();
+                    let mut names = Vec::new();
+                    // Only changed effective snapshots are warmed; never load other source facts.
+                    let mut remaining = 100_000;
+                    for id in snapshot_ids(&heads).difference(&old_ids) {
+                        if remaining == 0 || names.len() >= 16 {
+                            break;
+                        }
+                        let warmed = relation_names(&conn, id)?;
+                        if warmed.len() <= remaining {
+                            remaining -= warmed.len();
+                            names.push((id.clone(), Arc::new(warmed)));
+                        }
+                    }
+                    Ok(Box::new(PendingPublication {
+                        heads,
+                        names,
+                        views,
+                        conn,
+                        tasks,
+                        _writer: writer,
+                        _ownership: ownership,
+                    }))
+                })())
+            })
+            .map_err(framework_error)?
+            .wait_finished()
+            .await
+            .map_err(framework_error)?
+    }
+
     async fn virtual_database_mutation(
         &self,
         mutation: VirtualDatabaseMutation,
@@ -26,8 +170,14 @@ impl ManagementStore for DuckdbStore {
     ) -> Result<VirtualDatabaseReceipt> {
         // Keep lock order instance barrier -> writer -> transaction. Cancellation of the
         // waiter must never release the barrier while the blocking worker is committing.
-        let permit = self.writer.clone().lock_owned().await;
+        let permit = self.writer.clone().try_lock_owned().map_err(|_| {
+            EngineError::new(
+                "55P03",
+                "metadata publication is preparing; retry with the same Idempotency-Key",
+            )
+        })?;
         let root = self.root.clone();
+        let views = self.views.clone();
         self.tasks
             .spawn_blocking_io(move |_| {
                 let _ownership = ownership;
@@ -38,7 +188,11 @@ impl ManagementStore for DuckdbStore {
                     .try_clone()
                     .map_err(engine_error)
                     .map_err(fw)?;
-                Ok(crate::virtuals::mutate(&conn, mutation, key, users))
+                let result = crate::virtuals::mutate(&conn, mutation, key, users);
+                if result.is_ok() {
+                    views.lock().unwrap().heads = Some(read_headers(&conn).map_err(fw)?);
+                }
+                Ok(result)
             })
             .map_err(framework_error)?
             .wait_finished()
@@ -48,21 +202,35 @@ impl ManagementStore for DuckdbStore {
     async fn relation_names(
         &self,
         snapshot: String,
-    ) -> Result<std::collections::BTreeSet<(String, String)>> {
+    ) -> Result<Arc<std::collections::BTreeSet<(String, String)>>> {
+        if let Some(names) = self.views.lock().unwrap().names(&snapshot) {
+            return Ok(names);
+        }
         let root = self.root.clone();
-        self.tasks.spawn_blocking_io(move |_| {
-            let conn=root.lock().unwrap().try_clone().map_err(engine_error).map_err(fw)?;
-            Ok((|| -> Result<_> {
-                let mut stmt=conn.prepare("SELECT _schema,relname FROM _fedengine.meta_pg_class WHERE _snapshot_id=? AND relkind IN ('r','v','m','f','p') LIMIT 100001").map_err(engine_error)?;
-                let mut rows=stmt.query([snapshot]).map_err(engine_error)?;
-                let mut names=std::collections::BTreeSet::new();
-                while let Some(row)=rows.next().map_err(engine_error)? {names.insert((row.get(0).map_err(engine_error)?,row.get(1).map_err(engine_error)?));}
-                if names.len()>100000{return Err(EngineError::new("54000","catalog name budget exceeded"));}
+        let views = self.views.clone();
+        self.tasks
+            .spawn_blocking_io(move |_| {
+                let conn = root
+                    .lock()
+                    .unwrap()
+                    .try_clone()
+                    .map_err(engine_error)
+                    .map_err(fw)?;
+                let names = Arc::new(relation_names(&conn, &snapshot).map_err(fw)?);
+                views.lock().unwrap().insert(snapshot, names.clone());
                 Ok(names)
-            })())
-        }).map_err(framework_error)?.wait_finished().await.map_err(framework_error)?
+            })
+            .map_err(framework_error)?
+            .wait_finished()
+            .await
+            .map_err(framework_error)
     }
+
     async fn catalog_headers(&self) -> Result<CatalogHeads> {
+        if let Some(heads) = self.views.lock().unwrap().heads.clone() {
+            return Ok(heads);
+        }
+        let views = self.views.clone();
         let root = self.root.clone();
         self.tasks
             .spawn_blocking_io(move |_| {
@@ -72,7 +240,10 @@ impl ManagementStore for DuckdbStore {
                     .try_clone()
                     .map_err(engine_error)
                     .map_err(fw)?;
-                Ok(read_headers(&conn))
+                let heads = read_headers(&conn).map_err(fw)?;
+                // A concurrent committed update may already have filled the cache.
+                let heads = views.lock().unwrap().heads.get_or_insert(heads).clone();
+                Ok(Ok(heads))
             })
             .map_err(framework_error)?
             .wait_finished()
@@ -106,7 +277,7 @@ impl ManagementStore for DuckdbStore {
                     .try_clone()
                     .map_err(engine_error)
                     .map_err(fw)?;
-                Ok(read_consistent(&conn))
+                Ok(local_read(&conn, read_heads))
             })
             .map_err(framework_error)?
             .wait_finished()
@@ -115,6 +286,7 @@ impl ManagementStore for DuckdbStore {
     }
     async fn update(&self, update: ManagementUpdate) -> Result<ManagementState> {
         let permit = self.writer.clone().lock_owned().await;
+        let views = self.views.clone();
         let root = self.root.clone();
         self.tasks
             .spawn_blocking_io(move |_| {
@@ -125,7 +297,11 @@ impl ManagementStore for DuckdbStore {
                     .try_clone()
                     .map_err(engine_error)
                     .map_err(fw)?;
-                Ok(transaction(&conn, update))
+                let result = metadata_transaction(&conn, update);
+                if result.is_ok() {
+                    views.lock().unwrap().heads = Some(read_headers(&conn).map_err(fw)?);
+                }
+                Ok(result)
             })
             .map_err(framework_error)?
             .wait_finished()
@@ -134,34 +310,36 @@ impl ManagementStore for DuckdbStore {
     }
 }
 fn read_headers(conn: &Connection) -> Result<CatalogHeads> {
-    local_read(conn, |conn| {
-        let mut stmt=conn.prepare("SELECT s.payload,r.payload,c.payload FROM _fedengine.data_sources s LEFT JOIN _fedengine.source_revisions r ON r.key=json_extract_string(s.payload,'$.incarnation')||':'||json_extract_string(s.payload,'$.applied_revision') LEFT JOIN _fedengine.catalog_snapshots c ON c.key=json_extract_string(s.payload,'$.catalog_snapshot') WHERE NOT CAST(json_extract(s.payload,'$.deleted') AS BOOLEAN) ORDER BY s.key").map_err(engine_error)?;
-        let mut rows = stmt.query([]).map_err(engine_error)?;
-        let mut out = Vec::new();
-        while let Some(r) = rows.next().map_err(engine_error)? {
-            fn decode<T: DeserializeOwned>(s: String) -> Result<T> {
-                serde_json::from_str(&s).map_err(|_| storage_error())
-            }
-            out.push(CatalogHeader {
-                source: decode(r.get(0).map_err(engine_error)?)?,
-                applied: r
-                    .get::<_, Option<String>>(1)
-                    .map_err(engine_error)?
-                    .map(decode)
-                    .transpose()?,
-                snapshot: r
-                    .get::<_, Option<String>>(2)
-                    .map_err(engine_error)?
-                    .map(decode)
-                    .transpose()?,
-            });
+    local_read(conn, effective_heads)
+}
+fn effective_heads(conn: &Connection) -> Result<CatalogHeads> {
+    let mut stmt=conn.prepare("SELECT s.payload,r.payload,c.payload FROM _fedengine.data_sources s LEFT JOIN _fedengine.source_revisions r ON r.key=json_extract_string(s.payload,'$.incarnation')||':'||json_extract_string(s.payload,'$.applied_revision') LEFT JOIN _fedengine.catalog_snapshots c ON c.key=json_extract_string(s.payload,'$.catalog_snapshot') WHERE NOT CAST(json_extract(s.payload,'$.deleted') AS BOOLEAN) ORDER BY s.key").map_err(engine_error)?;
+    let mut rows = stmt.query([]).map_err(engine_error)?;
+    let mut out = Vec::new();
+    while let Some(r) = rows.next().map_err(engine_error)? {
+        fn decode<T: DeserializeOwned>(s: String) -> Result<T> {
+            serde_json::from_str(&s).map_err(|_| storage_error())
         }
-        Ok(CatalogHeads {
-            sources: out,
-            databases: crate::virtuals::read(conn)?,
-        })
+        out.push(CatalogHeader {
+            source: decode(r.get(0).map_err(engine_error)?)?,
+            applied: r
+                .get::<_, Option<String>>(1)
+                .map_err(engine_error)?
+                .map(decode)
+                .transpose()?,
+            snapshot: r
+                .get::<_, Option<String>>(2)
+                .map_err(engine_error)?
+                .map(decode)
+                .transpose()?,
+        });
+    }
+    Ok(CatalogHeads {
+        sources: out,
+        databases: crate::virtuals::read(conn)?,
     })
 }
+
 fn local_read<T>(conn: &Connection, read: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
     conn.execute_batch("BEGIN TRANSACTION")
         .map_err(engine_error)?;
@@ -203,7 +381,7 @@ fn read_directory(conn: &Connection, r: &DirectoryRequest) -> Result<CatalogPage
             .map_err(engine_error)?;
         let catalog: CatalogSnapshot =
             serde_json::from_str(&payload).map_err(|_| storage_error())?;
-        let filter = "json_extract_string(payload,'$[0]')=? AND (? IS NULL OR json_extract_string(payload,'$[1].schema')=?) AND (? IS NULL OR lower(json_extract_string(payload,'$[1].object_type'))=lower(?)) AND (? IS NULL OR json_extract_string(payload,'$[1].name')=?)";
+        let filter = "snapshot_id=? AND (? IS NULL OR schema_name=?) AND (? IS NULL OR lower(object_type)=lower(?)) AND (? IS NULL OR object_name=?)";
         let total: i64 = conn
             .query_row(
                 &format!("SELECT count(*) FROM _fedengine.catalog_objects WHERE {filter}"),
@@ -236,9 +414,8 @@ fn read_directory(conn: &Connection, r: &DirectoryRequest) -> Result<CatalogPage
             .map_err(engine_error)?;
         let mut objects = Vec::new();
         while let Some(row) = rows.next().map_err(engine_error)? {
-            let payload: String = row.get(0).map_err(engine_error)?;
-            let (_, object): (String, CatalogObject) =
-                serde_json::from_str(&payload).map_err(|_| storage_error())?;
+            let payload: Vec<u8> = row.get(0).map_err(engine_error)?;
+            let (_, object) = decode_object(&payload)?;
             objects.push(object);
         }
         Ok(CatalogPage {
@@ -279,6 +456,183 @@ fn read_map<T: DeserializeOwned>(conn: &Connection, table: &str) -> Result<BTree
     }
     Ok(values)
 }
+fn read_heads(conn: &Connection) -> Result<ManagementState> {
+    Ok(ManagementState {
+        sources: read_map(conn, "data_sources")?,
+        revisions: read_map(conn, "source_revisions")?,
+        operations: read_map(conn, "management_operations")?,
+        catalogs: read_map(conn, "catalog_snapshots")?,
+    })
+}
+fn load_objects(conn: &Connection, state: &mut ManagementState, id: &str) -> Result<()> {
+    let snapshot = state.catalogs.get_mut(id).ok_or_else(storage_error)?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT payload FROM _fedengine.catalog_objects WHERE starts_with(key,?) ORDER BY key",
+        )
+        .map_err(engine_error)?;
+    let mut rows = stmt.query([format!("{id}:")]).map_err(engine_error)?;
+    while let Some(row) = rows.next().map_err(engine_error)? {
+        let payload: Vec<u8> = row.get(0).map_err(engine_error)?;
+        let (_, object) = decode_object(&payload)?;
+        snapshot.objects.push(object);
+    }
+    Ok(())
+}
+/// Metadata-only updates cannot create relation payloads or rebuild projections.
+fn metadata_transaction(conn: &Connection, update: ManagementUpdate) -> Result<ManagementState> {
+    conn.execute_batch("BEGIN TRANSACTION")
+        .map_err(engine_error)?;
+    let result = (|| {
+        let before = read_heads(conn)?;
+        let mut after = before.clone();
+        update(&mut after)?;
+        if before
+            .revisions
+            .iter()
+            .any(|(key, value)| after.revisions.get(key) != Some(value))
+        {
+            return Err(EngineError::config("source revision history is immutable"));
+        }
+        if after.catalogs.values().any(|c| !c.objects.is_empty())
+            || after.catalogs.len() != before.catalogs.len()
+            || after
+                .catalogs
+                .keys()
+                .any(|id| !before.catalogs.contains_key(id))
+        {
+            return Err(EngineError::config(
+                "catalog payload requires explicit publication",
+            ));
+        }
+        validate_state(&after)?;
+        write_map(conn, "data_sources", &before.sources, &after.sources)?;
+        write_map(
+            conn,
+            "source_revisions",
+            &before.revisions,
+            &after.revisions,
+        )?;
+        write_map(
+            conn,
+            "schema_bindings",
+            &bindings(&before),
+            &bindings(&after),
+        )?;
+        write_map(
+            conn,
+            "management_operations",
+            &before.operations,
+            &after.operations,
+        )?;
+        write_map(conn, "catalog_snapshots", &before.catalogs, &after.catalogs)?;
+        conn.execute_batch("COMMIT").map_err(engine_error)?;
+        Ok(after)
+    })();
+    if result.is_err() {
+        let _ = conn.execute_batch("ROLLBACK");
+    }
+    result
+}
+fn prepare_changes(conn: &Connection, incarnation: &str, update: ManagementUpdate) -> Result<()> {
+    let mut before = read_heads(conn)?;
+    let mut after = before.clone();
+    update(&mut after)?;
+    // Failure/status-only publications do not need relation payloads either.
+    if after
+        .catalogs
+        .values()
+        .any(|c| c.database_oid == 0 && c.complete)
+        && let Some(id) = before
+            .sources
+            .get(incarnation)
+            .and_then(|s| s.catalog_snapshot.clone())
+    {
+        load_objects(conn, &mut before, &id)?;
+    }
+    crate::identity::prepare(conn, &before, &mut after)?;
+    reuse_unchanged_snapshots(&before, &mut after);
+    after.prune_catalogs(3);
+    write_changes(conn, &before, &after)?;
+    Ok(())
+}
+struct PendingPublication {
+    heads: CatalogHeads,
+    names: Vec<(String, SnapshotNames)>,
+    views: Arc<Mutex<CatalogViews>>,
+    conn: Connection,
+    tasks: TaskScheduler,
+    _writer: tokio::sync::OwnedMutexGuard<()>,
+    _ownership: Box<dyn Send>,
+}
+#[async_trait]
+impl PreparedPublication for PendingPublication {
+    async fn commit(
+        self: Box<Self>,
+        ownership: Box<dyn Send>,
+        published: Box<dyn FnOnce() + Send>,
+    ) -> Result<()> {
+        let tasks = self.tasks.clone();
+        let barrier_started = std::time::Instant::now();
+        let pending = tasks
+            .spawn_blocking_io(move |_| {
+                let _ownership = ownership;
+                let pending = self;
+                let started = std::time::Instant::now();
+                pending
+                    .conn
+                    .execute_batch("COMMIT")
+                    .map_err(engine_error)
+                    .map_err(fw)?;
+                {
+                    let mut views = pending.views.lock().unwrap();
+                    views.heads = Some(pending.heads.clone());
+                    for (id, names) in &pending.names {
+                        views.insert(id.clone(), names.clone());
+                    }
+                }
+                published();
+                tracing::debug!(
+                    elapsed_ms = started.elapsed().as_secs_f64() * 1000.,
+                    "management local commit finished"
+                );
+                Ok(pending)
+            })
+            .map_err(framework_error)?
+            .wait_finished()
+            .await
+            .map_err(framework_error)?;
+        tracing::debug!(
+            elapsed_ms = barrier_started.elapsed().as_secs_f64() * 1000.,
+            "management instance publication barrier released"
+        );
+        // A distinct worker starts only after the commit worker has really exited
+        // and released the instance barrier. Never FORCE CHECKPOINT or abort readers.
+        let checkpoint = tasks.spawn_blocking_io(move |_| {
+            let started = std::time::Instant::now();
+            if let Err(error) = pending.conn.execute_batch("CHECKPOINT") {
+                tracing::warn!(%error, "post-publication checkpoint deferred; committed WAL is retained");
+            }
+            tracing::debug!(elapsed_ms=started.elapsed().as_secs_f64()*1000., "management post-publication checkpoint finished");
+            drop(pending);
+            Ok(())
+        });
+        // Publication is already committed. Shutdown or maintenance failure must
+        // never relabel that confirmed outcome as an aborted publication.
+        match checkpoint {
+            Ok(job) => {
+                if let Err(error) = job.wait_finished().await {
+                    tracing::warn!(%error, "post-publication checkpoint worker failed; committed WAL is retained");
+                }
+            }
+            Err(error) => {
+                tracing::warn!(%error, "post-publication checkpoint was not scheduled; committed WAL is retained")
+            }
+        }
+        Ok(())
+    }
+}
+
 pub(super) fn read_state(conn: &Connection) -> Result<ManagementState> {
     let mut state = ManagementState {
         sources: read_map(conn, "data_sources")?,
@@ -286,8 +640,13 @@ pub(super) fn read_state(conn: &Connection) -> Result<ManagementState> {
         operations: read_map(conn, "management_operations")?,
         catalogs: read_map(conn, "catalog_snapshots")?,
     };
-    let objects: BTreeMap<String, (String, CatalogObject)> = read_map(conn, "catalog_objects")?;
-    for (_, (id, object)) in objects {
+    let mut statement = conn
+        .prepare("SELECT payload FROM _fedengine.catalog_objects ORDER BY key")
+        .map_err(engine_error)?;
+    let mut rows = statement.query([]).map_err(engine_error)?;
+    while let Some(row) = rows.next().map_err(engine_error)? {
+        let payload: Vec<u8> = row.get(0).map_err(engine_error)?;
+        let (id, object) = decode_object(&payload)?;
         state
             .catalogs
             .get_mut(&id)
@@ -297,17 +656,6 @@ pub(super) fn read_state(conn: &Connection) -> Result<ManagementState> {
     }
     validate_state(&state)?;
     Ok(state)
-}
-fn read_consistent(conn: &Connection) -> Result<ManagementState> {
-    conn.execute_batch("BEGIN TRANSACTION")
-        .map_err(engine_error)?;
-    let result = read_state(conn);
-    if result.is_ok() {
-        conn.execute_batch("COMMIT").map_err(engine_error)?;
-    } else {
-        let _ = conn.execute_batch("ROLLBACK");
-    }
-    result
 }
 fn write_map<T: Serialize + PartialEq>(
     conn: &Connection,
@@ -334,23 +682,68 @@ fn write_map<T: Serialize + PartialEq>(
     }
     Ok(())
 }
-fn catalog_rows(
-    state: &ManagementState,
-) -> (
-    BTreeMap<String, CatalogSnapshot>,
-    BTreeMap<String, (String, CatalogObject)>,
-) {
-    let mut snapshots = state.catalogs.clone();
-    let mut objects = BTreeMap::new();
-    for (id, snapshot) in &mut snapshots {
-        for (index, object) in std::mem::take(&mut snapshot.objects)
-            .into_iter()
-            .enumerate()
+fn write_catalogs(
+    conn: &Connection,
+    before: &ManagementState,
+    after: &ManagementState,
+) -> Result<()> {
+    let old_heads = before
+        .catalogs
+        .iter()
+        .map(|(id, c)| (id.clone(), c.header()))
+        .collect();
+    let heads = after
+        .catalogs
+        .iter()
+        .map(|(id, c)| (id.clone(), c.header()))
+        .collect();
+    write_map(conn, "catalog_snapshots", &old_heads, &heads)?;
+    for (id, snapshot) in &after.catalogs {
+        if before
+            .catalogs
+            .get(id)
+            .is_some_and(|old| old.objects == snapshot.objects)
         {
-            objects.insert(format!("{id}:{index:010}"), (id.clone(), object));
+            continue;
         }
+        // Existing untouched headers have no payload in source-scoped updates.
+        if snapshot.objects.is_empty() && before.catalogs.contains_key(id) {
+            continue;
+        }
+        conn.execute(
+            "DELETE FROM _fedengine.catalog_objects WHERE starts_with(key,?)",
+            [format!("{id}:")],
+        )
+        .map_err(engine_error)?;
+        let mut app = conn
+            .appender_to_db("catalog_objects", "_fedengine")
+            .map_err(engine_error)?;
+        for (index, object) in snapshot.objects.iter().enumerate() {
+            use duckdb::types::Value as V;
+            app.append_row(appender_params_from_iter([
+                V::Text(format!("{id}:{index:010}")),
+                V::Text(id.clone()),
+                V::Text(object.schema.clone()),
+                V::Text(object.name.clone()),
+                V::Text(object.object_type.clone()),
+                V::Blob(encode_object(id, object)?),
+            ]))
+            .map_err(engine_error)?;
+        }
+        app.flush().map_err(engine_error)?;
     }
-    (snapshots, objects)
+    for id in before
+        .catalogs
+        .keys()
+        .filter(|id| !after.catalogs.contains_key(*id))
+    {
+        conn.execute(
+            "DELETE FROM _fedengine.catalog_objects WHERE starts_with(key,?)",
+            [format!("{id}:")],
+        )
+        .map_err(engine_error)?;
+    }
+    Ok(())
 }
 fn bindings(state: &ManagementState) -> BTreeMap<String, SchemaBinding> {
     state
@@ -488,22 +881,24 @@ fn write_changes(
         &before.operations,
         &after.operations,
     )?;
-    let (old_snapshots, old_objects) = catalog_rows(before);
-    let (snapshots, objects) = catalog_rows(after);
-    write_map(conn, "catalog_snapshots", &old_snapshots, &snapshots)?;
-    write_map(conn, "catalog_objects", &old_objects, &objects)?;
+    write_catalogs(conn, before, after)?;
     Ok(())
 }
 fn reuse_unchanged_snapshots(before: &ManagementState, after: &mut ManagementState) {
-    fn facts(snapshot: &CatalogSnapshot) -> Vec<CatalogObject> {
-        let mut objects = snapshot.objects.clone();
-        for object in &mut objects {
-            for status in object.metadata.status.values_mut() {
-                status.last_attempt_at = None;
-                status.last_success_at = None;
-            }
-        }
-        objects
+    fn same_facts(old: &CatalogSnapshot, new: &CatalogSnapshot) -> bool {
+        old.objects.len() == new.objects.len()
+            && old.objects.iter().zip(&new.objects).all(|(a, b)| {
+                // At most two objects, rather than two entire catalogs, are copied for comparison.
+                let mut a = a.clone();
+                let mut b = b.clone();
+                for o in [&mut a, &mut b] {
+                    for status in o.metadata.status.values_mut() {
+                        status.last_attempt_at = None;
+                        status.last_success_at = None;
+                    }
+                }
+                a == b
+            })
     }
     let replacements = after
         .catalogs
@@ -518,7 +913,7 @@ fn reuse_unchanged_snapshots(before: &ManagementState, after: &mut ManagementSta
             if old.stale != new.stale
                 || old.schemas != new.schemas
                 || old.structure_digest != new.structure_digest
-                || facts(old) != facts(new)
+                || !same_facts(old, new)
             {
                 return None;
             }
@@ -571,7 +966,7 @@ pub(super) fn initialize(conn: &Connection, config: &Config) -> Result<()> {
             |r| r.get(0),
         )
         .map_err(engine_error)?;
-    if version != 0 && version != 5 {
+    if version != 0 && version != 6 {
         return Err(EngineError::config(
             "management schema version does not match this program",
         ));
@@ -585,17 +980,17 @@ pub(super) fn initialize(conn: &Connection, config: &Config) -> Result<()> {
             "source_revisions",
             "schema_bindings",
             "catalog_snapshots",
-            "catalog_objects",
             "management_operations",
         ] {
             conn.execute_batch(&format!("CREATE TABLE IF NOT EXISTS _fedengine.{table}(key VARCHAR PRIMARY KEY, payload VARCHAR NOT NULL)")).map_err(engine_error)?;
         }
+        conn.execute_batch("CREATE TABLE IF NOT EXISTS _fedengine.catalog_objects(key VARCHAR PRIMARY KEY,snapshot_id VARCHAR NOT NULL,schema_name VARCHAR NOT NULL,object_name VARCHAR NOT NULL,object_type VARCHAR NOT NULL,payload BLOB NOT NULL)").map_err(engine_error)?;
         crate::identity::initialize(conn)?;
         crate::projection::initialize(conn)?;
         crate::virtuals::initialize(conn, config)?;
         if version == 0 {
             conn.execute(
-                "INSERT INTO _fedengine.schema_migrations VALUES (5, ?)",
+                "INSERT INTO _fedengine.schema_migrations VALUES (6, ?)",
                 [chrono::Utc::now().to_rfc3339()],
             )
             .map_err(engine_error)?;
@@ -694,6 +1089,122 @@ pub(super) fn initialize(conn: &Connection, config: &Config) -> Result<()> {
 mod tests {
     use super::*;
     #[test]
+    fn snapshot_name_cache_shares_indexes_and_bounds_retained_entries() {
+        let mut cache = CatalogViews::default();
+        let large: SnapshotNames = Arc::new(
+            (0..60_000)
+                .map(|i| ("public".into(), format!("t_{i}")))
+                .collect(),
+        );
+        cache.insert("old".into(), large.clone());
+        assert!(Arc::ptr_eq(&cache.names("old").unwrap(), &large));
+        cache.insert("new".into(), large);
+        assert!(cache.names("old").is_none());
+        assert!(cache.count <= 100_000);
+        for i in 0..20 {
+            cache.insert(format!("empty-{i}"), Arc::default());
+        }
+        assert_eq!(cache.names.len(), 16);
+        assert_eq!(cache.count, 0);
+    }
+    #[test]
+    fn prepared_projection_is_invisible_until_commit_and_drop_rolls_it_back() {
+        let mut config = Config::load(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/application.toml"),
+        )
+        .unwrap();
+        config.datasources = vec![DataSourceDefinition {
+            id: DataSourceId("source".into()),
+            kind: DataSourceKind::Postgres,
+            catalog_alias: "source".into(),
+            secret_ref: "UNUSED".into(),
+            default_schema: "public".into(),
+            allowed_schemas: vec!["public".into()],
+            enabled: false,
+            read_only: true,
+            ddl_enabled: false,
+        }];
+        let root = Connection::open_in_memory().unwrap();
+        initialize(&root, &config).unwrap();
+        let incarnation = read_heads(&root)
+            .unwrap()
+            .source(&DataSourceId("source".into()))
+            .unwrap()
+            .incarnation
+            .clone();
+        fn update(id: &str) -> ManagementUpdate {
+            let id = id.to_owned();
+            Box::new(move |state| {
+                let source = state.sources.values_mut().next().unwrap();
+                source.status = SourceStatus::Active;
+                source.applied_revision = Some(1);
+                source.catalog_snapshot = Some(id.clone());
+                state.catalogs.insert(
+                    id.clone(),
+                    CatalogSnapshot {
+                        structure_digest: id.clone(),
+                        id,
+                        incarnation: source.incarnation.clone(),
+                        revision: 1,
+                        generation: 1,
+                        refreshed_at: "now".into(),
+                        complete: true,
+                        stale: false,
+                        database_oid: 0,
+                        schema_oids: Default::default(),
+                        schemas: vec!["public".into()],
+                        objects: vec![],
+                    },
+                );
+                Ok(())
+            })
+        }
+        let conn = root.try_clone().unwrap();
+        conn.execute_batch("BEGIN TRANSACTION").unwrap();
+        prepare_changes(&conn, &incarnation, update("published")).unwrap();
+        assert!(read_heads(&root).unwrap().catalogs.is_empty());
+        assert_eq!(root.query_row("SELECT count(*) FROM _fedengine.metadata_projection_state WHERE snapshot_id='published'",[],|r|r.get::<_,i64>(0)).unwrap(),0);
+        conn.execute_batch("COMMIT").unwrap();
+        drop(conn);
+        let visible = read_heads(&root).unwrap();
+        assert_eq!(
+            visible.sources[&incarnation].catalog_snapshot.as_deref(),
+            Some("published")
+        );
+        let conn = root.try_clone().unwrap();
+        conn.execute_batch("BEGIN TRANSACTION").unwrap();
+        prepare_changes(&conn, &incarnation, update("aborted")).unwrap();
+        drop(conn);
+        assert_eq!(read_heads(&root).unwrap(), visible);
+        assert_eq!(root.query_row("SELECT count(*) FROM _fedengine.metadata_projection_state WHERE snapshot_id='aborted'",[],|r|r.get::<_,i64>(0)).unwrap(),0);
+    }
+    #[test]
+    fn metadata_only_update_never_reads_or_rewrites_relation_payloads() {
+        let config = Config::load(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/application.toml"),
+        )
+        .unwrap();
+        let conn = Connection::open_in_memory().unwrap();
+        initialize(&conn, &config).unwrap();
+        // Poisoned payload makes any accidental full-state read fail deterministically.
+        conn.execute(
+            "INSERT INTO _fedengine.catalog_objects VALUES ('unrelated','unrelated','public','poison','BASE TABLE','not compressed'::BLOB)",
+            [],
+        )
+        .unwrap();
+        assert!(read_state(&conn).is_err());
+        metadata_transaction(&conn, Box::new(|_| Ok(()))).unwrap();
+        assert_eq!(
+            conn.query_row(
+                "SELECT payload FROM _fedengine.catalog_objects WHERE key='unrelated'",
+                [],
+                |r| r.get::<_, Vec<u8>>(0)
+            )
+            .unwrap(),
+            b"not compressed"
+        );
+    }
+    #[test]
     fn bootstrap_is_once_transactions_rollback_and_other_versions_are_refused() {
         let mut config = Config::load(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/application.toml"),
@@ -717,7 +1228,7 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!(version, 5);
+        assert_eq!(version, 6);
         let source = DataSourceDefinition {
             id: DataSourceId("must_not_reappear".into()),
             kind: DataSourceKind::Postgres,
@@ -758,7 +1269,7 @@ mod tests {
         );
         assert!(failure.is_err());
         assert_eq!(read_state(&connection).unwrap(), before);
-        for version in [1, 4, 99] {
+        for version in [1, 4, 5, 99] {
             connection.execute_batch(&format!("DELETE FROM _fedengine.schema_migrations; INSERT INTO _fedengine.schema_migrations VALUES ({version}, 'unsupported')")).unwrap();
             assert!(
                 initialize(&connection, &config)

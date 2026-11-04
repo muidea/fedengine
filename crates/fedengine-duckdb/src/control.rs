@@ -10,14 +10,24 @@ use fedengine_contract::*;
 use fedengine_core::*;
 use fedengine_datasource::DataSourceRegistry;
 
-pub(super) fn attach(
+pub(super) fn load_extension(
     conn: &Connection,
     config: &Config,
-    source: &DataSourceDefinition,
+    kind: DataSourceKind,
 ) -> Result<()> {
-    validate_source(source)?;
-    let kind = source.kind;
     let extension = kind.extension();
+    // The verified native code belongs to the instance. Subsequent attachments
+    // must not re-read its on-disk binary while holding the instance barrier.
+    let loaded: bool = conn
+        .query_row(
+            "SELECT loaded FROM duckdb_extensions() WHERE extension_name=?",
+            [format!("{extension}_scanner")],
+            |row| row.get(0),
+        )
+        .map_err(engine_error)?;
+    if loaded {
+        return Ok(());
+    }
     let d = &config.duckdb;
     if d.install_extensions {
         conn.execute_batch("SET custom_extension_repository='https://extensions.duckdb.org'")
@@ -42,6 +52,17 @@ pub(super) fn attach(
         )
     };
     conn.execute_batch(&settings).map_err(engine_error)?;
+    Ok(())
+}
+pub(super) fn attach(
+    conn: &Connection,
+    config: &Config,
+    source: &DataSourceDefinition,
+) -> Result<()> {
+    validate_source(source)?;
+    let kind = source.kind;
+    let extension = kind.extension();
+    load_extension(conn, config, kind)?;
     let secret = resolve(&source.secret_ref, &config.management.credentials_directory)?;
     conn.execute_batch(&format!(
         "ATTACH {} AS {} (TYPE {extension}{})",
@@ -110,96 +131,30 @@ pub(super) fn execute(
         error: None,
     };
     match action {
-        ControlAction::Inspect {
-            revision,
-            reuse_attached,
-        } => {
-            if reuse_attached {
-                outcome.schemas = discover(conn, &revision.effective_definition())?;
-                return Ok(outcome);
-            }
-            let mut definition = revision.effective_definition();
-            definition.catalog_alias =
-                format!("_fedengine_probe_{}", uuid::Uuid::new_v4().simple());
-            attach(conn, config, &definition)?;
-            let result = discover(conn, &definition);
-            let cleanup = detach(conn, &definition.catalog_alias);
-            outcome.schemas = result?;
-            cleanup?;
-        }
-        ControlAction::Switch { previous, next } => {
-            let strict_identity = config
-                .management
-                .mysql_identity_policy
-                .resets(next.definition.kind);
-            // Probe another revision without disturbing the old applied attachment.
-            let mut temporary = next.effective_definition();
-            temporary.catalog_alias = format!("_fedengine_probe_{}", uuid::Uuid::new_v4().simple());
-            let probe = (|| {
-                attach(conn, config, &temporary)?;
-                let result = discover(conn, &temporary).and_then(|schemas| {
-                    if next
-                        .bindings
-                        .iter()
-                        .any(|b| b.enabled && !schemas.contains(&b.remote_schema))
-                    {
-                        Err(EngineError::config(
-                            "selected schema does not exist in the target database",
-                        ))
-                    } else {
-                        Ok(())
-                    }
-                });
-                let cleanup = detach(conn, &temporary.catalog_alias);
-                result?;
-                cleanup
-            })();
-            if let Err(error) = probe {
-                if strict_identity {
-                    if let Some(old) = &previous {
-                        detach(conn, &old.definition.catalog_alias)?;
-                    }
-                } else {
-                    outcome.restored_previous = previous.is_some();
-                }
-                outcome.error = Some(error);
-                return Ok(outcome);
-            }
+        ControlAction::Mount { previous, next } => {
             if let Some(old) = &previous {
                 detach(conn, &old.definition.catalog_alias)?;
             }
-            let definition = next.effective_definition();
-            let result = attach(conn, config, &definition).and_then(|_| capture(conn, &next));
-            match result {
-                Ok(snapshot) => outcome.catalog = Some(snapshot),
-                Err(error) => {
-                    let _ = detach(conn, &definition.catalog_alias);
-                    if let Some(old) = previous.filter(|_| !strict_identity)
-                        && let Ok(snapshot) = attach(conn, config, &old.effective_definition())
-                            .and_then(|_| capture(conn, &old))
-                    {
-                        outcome.restored_previous = true;
-                        outcome.catalog = Some(snapshot);
-                    }
-                    outcome.error = Some(error);
+            if let Some(next) = next
+                && let Err(error) = attach(conn, config, &next.effective_definition())
+            {
+                let strict = config
+                    .management
+                    .mysql_identity_policy
+                    .resets(next.definition.kind);
+                if !strict && let Some(old) = &previous {
+                    outcome.restored_previous =
+                        attach(conn, config, &old.effective_definition()).is_ok();
                 }
+                outcome.error = Some(error);
             }
         }
-        ControlAction::Disable(revision) => detach(conn, &revision.definition.catalog_alias)?,
-        ControlAction::Refresh(revision) => {
+        ControlAction::ClearCache(revision) => {
             conn.execute_batch(&format!(
                 "CALL {}_clear_cache()",
                 revision.definition.kind.extension()
             ))
             .map_err(engine_error)?;
-            let mut scanned = revision;
-            if !config.management.enabled {
-                let available = discover(conn, &scanned.effective_definition())?;
-                scanned
-                    .bindings
-                    .retain(|b| available.contains(&b.remote_schema));
-            }
-            outcome.catalog = Some(capture(conn, &scanned)?);
         }
     }
     Ok(outcome)

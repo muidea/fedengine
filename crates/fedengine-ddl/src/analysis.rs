@@ -5,13 +5,30 @@ use crate::{
 use fedengine_core::*;
 use sqlparser::{ast::*, dialect::DuckDbDialect, parser::Parser};
 use std::{collections::BTreeSet, ops::ControlFlow};
+/// Shared immutable relation indexes from the current catalog snapshots.
+#[derive(Debug, Clone, Default)]
+pub struct RelationNames(Vec<std::sync::Arc<BTreeSet<(String, String)>>>);
+impl RelationNames {
+    pub fn extend_shared(&mut self, names: std::sync::Arc<BTreeSet<(String, String)>>) {
+        self.0.push(names);
+    }
+    pub fn contains(&self, name: &(String, String)) -> bool {
+        self.0.iter().any(|names| names.contains(name))
+    }
+}
+impl<const N: usize> From<[(String, String); N]> for RelationNames {
+    fn from(names: [(String, String); N]) -> Self {
+        Self(vec![std::sync::Arc::new(names.into_iter().collect())])
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct BindingNamespace {
     pub catalog: String,
     pub allow_cross_database: bool,
     pub bindings: std::collections::BTreeMap<String, (DataSourceId, String)>,
     pub search_path: Vec<String>,
-    pub relations: BTreeSet<(String, String)>,
+    pub relations: RelationNames,
 }
 #[derive(Debug, Clone)]
 pub struct Analyzer {

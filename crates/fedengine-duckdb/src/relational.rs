@@ -7,7 +7,12 @@ use std::collections::BTreeMap;
 
 type Objects = BTreeMap<(String, String), CatalogObject>;
 type Row = (String, String, Value);
-fn rows(conn: &Connection, source: &DataSourceDefinition, sql: &str) -> Result<Vec<Row>> {
+fn rows(
+    conn: &Connection,
+    source: &DataSourceDefinition,
+    sql: &str,
+    budget: usize,
+) -> Result<Vec<Row>> {
     let sql = format!(
         "SELECT * FROM {}_query({}, {})",
         source.kind.extension(),
@@ -29,7 +34,7 @@ fn rows(conn: &Connection, source: &DataSourceDefinition, sql: &str) -> Result<V
         let table = metadata_text(row, 1)?;
         let json = metadata_text(row, 2)?;
         bytes += json.len() + schema.len() + table.len();
-        if out.len() >= 100_000 || bytes > 128 * 1024 * 1024 {
+        if out.len() >= 100_000 || bytes > budget {
             return Err(EngineError::new(
                 "54000",
                 "relational metadata result budget exceeded",
@@ -294,6 +299,66 @@ fn apply(
     }
     Ok(())
 }
+/// Move only the affected category aside. Failed decoding restores it without copying the catalog.
+fn take_category(metadata: &mut ObjectMetadata, category: &str) -> ObjectMetadata {
+    let mut out = ObjectMetadata::default();
+    match category {
+        "statistics" => out.statistics = std::mem::take(&mut metadata.statistics),
+        "storage" => out.storage = std::mem::take(&mut metadata.storage),
+        "activity" => out.activity = std::mem::take(&mut metadata.activity),
+        "column_statistics" => {
+            out.column_statistics = std::mem::take(&mut metadata.column_statistics)
+        }
+        "column_properties" => out.columns = std::mem::take(&mut metadata.columns),
+        "constraints" => out.constraints = std::mem::take(&mut metadata.constraints),
+        "indexes" => out.indexes = std::mem::take(&mut metadata.indexes),
+        "details" => {
+            out.source_id = metadata.source_id.take();
+            out.comment = metadata.comment.take();
+            out.view_definition = metadata.view_definition.take();
+            out.view_dependencies = metadata.view_dependencies.take();
+        }
+        _ => unreachable!("known collector category"),
+    }
+    out
+}
+fn restore_category(metadata: &mut ObjectMetadata, mut old: ObjectMetadata, category: &str) {
+    let _ = take_category(metadata, category);
+    match category {
+        "statistics" => metadata.statistics = old.statistics,
+        "storage" => metadata.storage = old.storage,
+        "activity" => metadata.activity = old.activity,
+        "column_statistics" => metadata.column_statistics = old.column_statistics,
+        "column_properties" => metadata.columns = old.columns,
+        "constraints" => metadata.constraints = old.constraints,
+        "indexes" => metadata.indexes = old.indexes,
+        "details" => {
+            metadata.source_id = old.source_id.take();
+            metadata.comment = old.comment.take();
+            metadata.view_definition = old.view_definition.take();
+            metadata.view_dependencies = old.view_dependencies.take();
+        }
+        _ => unreachable!("known collector category"),
+    }
+}
+fn apply_atomic(
+    objects: &mut Objects,
+    category: &str,
+    facts: Vec<Row>,
+    kind: DataSourceKind,
+) -> Result<()> {
+    let saved: Vec<_> = objects
+        .values_mut()
+        .map(|o| take_category(&mut o.metadata, category))
+        .collect();
+    let result = apply(objects, category, facts, kind);
+    if result.is_err() {
+        for (object, old) in objects.values_mut().zip(saved) {
+            restore_category(&mut object.metadata, old, category);
+        }
+    }
+    result
+}
 fn pg_queries(version: u32, condition: &str) -> Vec<(&'static str, String)> {
     let identity = if version >= 100000 {
         "nullif(a.attidentity::text,'')"
@@ -438,6 +503,7 @@ pub(super) fn capture(
     conn: &Connection,
     source: &DataSourceDefinition,
     objects: &mut Objects,
+    budget: usize,
 ) -> Result<()> {
     let scope = source
         .allowed_schemas
@@ -499,12 +565,14 @@ pub(super) fn capture(
         )
     };
     for (category, sql) in queries {
-        let result = rows(conn, source, &sql).and_then(|facts| {
-            let mut staged = objects.clone();
-            apply(&mut staged, category, facts, source.kind)?;
-            *objects = staged;
-            Ok(())
-        });
+        let result = rows(conn, source, &sql, budget)
+            .and_then(|facts| apply_atomic(objects, category, facts, source.kind));
+        if let Err(error) = &result
+            && error.sqlstate == "54000"
+        {
+            return Err(error.clone());
+        }
+        crate::catalog::enforce_budget(&objects.values().collect::<Vec<_>>(), budget)?;
         let mut status = match result {
             Ok(()) => MetadataStatus::success(),
             Err(error) => MetadataStatus::failure(&error),
@@ -678,6 +746,62 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    #[test]
+    fn failed_category_rolls_back_partial_changes_without_losing_other_facts() {
+        let object = CatalogObject {
+            schema: "public".into(),
+            name: "a".into(),
+            object_type: "BASE TABLE".into(),
+            columns: vec![],
+            indexes: vec![],
+            metadata: ObjectMetadata {
+                comment: Some("retain".into()),
+                storage: RelationStorage {
+                    main_bytes: Some(100),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        };
+        let mut other = object.clone();
+        other.name = "b".into();
+        let mut objects: Objects = [
+            (("public".into(), "a".into()), object),
+            (("public".into(), "b".into()), other),
+        ]
+        .into();
+        let before = objects.clone();
+        let facts = vec![
+            ("public".into(), "a".into(), json!({"main_bytes":200})),
+            ("public".into(), "b".into(), json!({"main_bytes":-1})),
+        ];
+        assert!(apply_atomic(&mut objects, "storage", facts, DataSourceKind::Postgres).is_err());
+        assert_eq!(objects, before);
+        apply_atomic(
+            &mut objects,
+            "storage",
+            vec![
+                ("public".into(), "a".into(), json!({})),
+                ("public".into(), "b".into(), json!({})),
+            ],
+            DataSourceKind::Postgres,
+        )
+        .unwrap();
+        assert_eq!(
+            objects[&("public".into(), "a".into())]
+                .metadata
+                .storage
+                .main_bytes,
+            None
+        );
+        assert_eq!(
+            objects[&("public".into(), "a".into())]
+                .metadata
+                .comment
+                .as_deref(),
+            Some("retain")
+        );
+    }
     #[test]
     fn storage_and_activity_require_complete_unique_typed_enumeration() {
         let objects = [(

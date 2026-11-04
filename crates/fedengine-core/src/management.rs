@@ -24,6 +24,8 @@ pub struct ManagementConfig {
     pub credentials_directory: String,
     pub queue_capacity: usize,
     pub max_concurrent_operations: usize,
+    pub metadata_memory_budget_mb: u32,
+    pub metadata_operation_memory_mb: u32,
     pub drain_timeout_ms: u64,
     pub request_timeout_ms: u64,
     pub mysql_identity_policy: MysqlIdentityPolicy,
@@ -36,6 +38,8 @@ impl Default for ManagementConfig {
             credentials_directory: "./secrets".into(),
             queue_capacity: 64,
             max_concurrent_operations: 2,
+            metadata_memory_budget_mb: 512,
+            metadata_operation_memory_mb: 256,
             drain_timeout_ms: 30_000,
             request_timeout_ms: 10_000,
             mysql_identity_policy: MysqlIdentityPolicy::Preserve,
@@ -253,6 +257,25 @@ pub struct CatalogSnapshot {
     pub structure_digest: String,
     pub schemas: Vec<String>,
     pub objects: Vec<CatalogObject>,
+}
+impl CatalogSnapshot {
+    /// Lightweight publication head without relation payloads.
+    pub fn header(&self) -> Self {
+        Self {
+            database_oid: self.database_oid,
+            schema_oids: self.schema_oids.clone(),
+            id: self.id.clone(),
+            incarnation: self.incarnation.clone(),
+            revision: self.revision,
+            generation: self.generation,
+            refreshed_at: self.refreshed_at.clone(),
+            complete: self.complete,
+            stale: self.stale,
+            structure_digest: self.structure_digest.clone(),
+            schemas: self.schemas.clone(),
+            objects: vec![],
+        }
+    }
 }
 /// Persisted state, exposed only through the controlled storage service.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]

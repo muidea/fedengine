@@ -447,6 +447,21 @@ async fn zero_source_online_activation_catalog_refresh_rollback_portal_drain_and
             assert_eq!(metadata["status"]["activity"]["support"], "unsupported");
         }
 
+        fn facts(page: &Value) -> Value {
+            let mut objects = page["objects"].clone();
+            for object in objects.as_array_mut().unwrap() {
+                for status in object["metadata"]["status"]
+                    .as_object_mut()
+                    .unwrap()
+                    .values_mut()
+                {
+                    status.as_object_mut().unwrap().remove("last_attempt_at");
+                    status.as_object_mut().unwrap().remove("last_success_at");
+                }
+            }
+            json!([page["schemas"], page["stale"], objects])
+        }
+        let mut previous_facts = get(address, &format!("sources/{id}/catalog?limit=1000")).await;
         for round in 0..2 {
             let current = get(address, &format!("sources/{id}")).await;
             submit(
@@ -468,7 +483,14 @@ async fn zero_source_online_activation_catalog_refresh_rollback_portal_drain_and
                     .get("activity")
                     .is_none()
             );
-            assert_eq!(catalog["snapshot_id"], unchanged["snapshot_version"]);
+            // Source counters can become visible asynchronously when a scanner's
+            // independent PG connection closes. Reuse depends on facts, not DDL alone.
+            let refreshed = get(address, &format!("sources/{id}/catalog?limit=1000")).await;
+            assert_eq!(
+                previous_facts["snapshot_id"] == refreshed["snapshot_id"],
+                facts(&previous_facts) == facts(&refreshed)
+            );
+            previous_facts = refreshed;
             assert_eq!(
                 catalog["objects"][0]["metadata"]["oid"],
                 unchanged["objects"][0]["metadata"]["oid"]
@@ -1094,6 +1116,12 @@ async fn zero_source_online_activation_catalog_refresh_rollback_portal_drain_and
     )
     .await;
     assert_eq!(waiting["status"], "WaitingForDrain");
+    // The source-backed database intentionally closes admission during disable.
+    // An existing logical database remains open for queries that do not use that source.
+    tokio::time::timeout(Duration::from_secs(1), mapped.simple_query("SELECT 1"))
+        .await
+        .expect("a suspended portal and pending disable must not block unrelated queries")
+        .unwrap();
     assert_eq!(
         http(
             address,
@@ -1544,4 +1572,328 @@ async fn mysql_strict_identity_rotates_on_resume_and_startup() {
     admin
         .execute_batch("DROP TABLE admin_strict.erp.strict_identity_probe")
         .unwrap();
+}
+
+/// Full remote collection/publication regression. Run only against the disposable
+/// PostgreSQL fixture; object/column counts and repetitions are explicit inputs.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore = "remote scale workload; see docs/development.md, run separately from functional regression"]
+async fn metadata_scale_refresh_preserves_query_admission_and_memory_budget() {
+    use std::sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    };
+    use std::time::Instant;
+    let objects: usize = std::env::var("FEDENGINE_SCALE_OBJECTS")
+        .unwrap_or_else(|_| "10000".into())
+        .parse()
+        .unwrap();
+    let columns: usize = std::env::var("FEDENGINE_SCALE_COLUMNS")
+        .unwrap_or_else(|_| "1".into())
+        .parse()
+        .unwrap();
+    let rounds: usize = std::env::var("FEDENGINE_SCALE_ROUNDS")
+        .unwrap_or_else(|_| "10".into())
+        .parse()
+        .unwrap();
+    assert!(
+        (1..=10000).contains(&objects) && columns > 0 && objects * columns <= 100000 && rounds >= 3
+    );
+    let rss_limit: u64 = std::env::var("FEDENGINE_SCALE_RSS_MB")
+        .unwrap_or_else(|_| "1024".into())
+        .parse::<u64>()
+        .unwrap()
+        * 1024
+        * 1024;
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("warn,fedengine_duckdb::catalog=debug,fedengine_duckdb::identity=debug,fedengine_duckdb::projection=debug,fedengine_duckdb::storage=debug,fedengine_duckdb::runtime=debug,fedengine_management::coordinator=debug,fedengine_query=debug")
+        .with_test_writer()
+        .try_init();
+    let (admin, connection) = tokio_postgres::connect(
+        &std::env::var("FEDENGINE_POSTGRES_DSN").unwrap(),
+        tokio_postgres::NoTls,
+    )
+    .await
+    .unwrap();
+    let admin_driver = tokio::spawn(async move {
+        connection.await.unwrap();
+    });
+    let schema = format!("scale_{}", uuid::Uuid::new_v4().simple());
+    let fields = (0..columns)
+        .map(|i| format!("c{i} integer"))
+        .collect::<Vec<_>>()
+        .join(",");
+    admin.batch_execute(&format!("CREATE SCHEMA {schema}; DO $body$ BEGIN FOR i IN 0..{} LOOP EXECUTE format('CREATE TABLE {schema}.t_%s ({fields})',i); END LOOP; END $body$; INSERT INTO {schema}.t_0(c0) VALUES (7)",objects-1)).await.unwrap();
+    let temporary = TestDirectory::new();
+    let mut config = configuration(&temporary);
+    config.duckdb.memory_limit = "256MB".into();
+    if columns > 1 {
+        config.management.metadata_operation_memory_mb = 512;
+        config.management.metadata_memory_budget_mb = 512;
+    }
+    config.duckdb.extension_directory = Some(
+        std::fs::canonicalize("data/extensions")
+            .unwrap()
+            .to_string_lossy()
+            .into(),
+    );
+    config.virtual_databases = vec![VirtualDatabaseConfig {
+        name: "bench".into(),
+        owner: "fedengine".into(),
+        connect: vec![],
+        allow_connections: true,
+        schemas: vec![VirtualSchemaConfig {
+            name: "business".into(),
+            source: DataSourceId("scale".into()),
+            remote_schema: schema.clone(),
+        }],
+    }];
+    config.grants = vec![Grant {
+        principal: "fedengine".into(),
+        source: DataSourceId("scale".into()),
+        schema: "*".into(),
+        object: "*".into(),
+        actions: ["SELECT".into()].into(),
+    }];
+    std::fs::write(
+        temporary.path().join("scale.dsn"),
+        std::env::var("FEDENGINE_POSTGRES_DSN").unwrap(),
+    )
+    .unwrap();
+    let engine = FedEngine::start(config).await.unwrap();
+    let address = engine.management_address().unwrap();
+    let mut login = tokio_postgres::Config::new();
+    login
+        .host("127.0.0.1")
+        .port(engine.address().unwrap().port())
+        .user("fedengine")
+        .password(std::env::var("USER").unwrap())
+        .dbname("bench");
+    let (client, connection) = login.connect(tokio_postgres::NoTls).await.unwrap();
+    let driver = tokio::spawn(async move {
+        connection.await.unwrap();
+    });
+    let mut baseline = Vec::new();
+    for _ in 0..50 {
+        let start = Instant::now();
+        client.simple_query("SELECT 1").await.unwrap();
+        baseline.push(start.elapsed().as_secs_f64());
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    baseline.sort_by(f64::total_cmp);
+    let baseline_p99 = baseline[baseline.len() - 1];
+    let stop = Arc::new(AtomicBool::new(false));
+    let samples = Arc::new(Mutex::new(Vec::<(f64, Option<String>)>::new()));
+    let task_stop = stop.clone();
+    let task_samples = samples.clone();
+    let query = tokio::spawn(async move {
+        while !task_stop.load(Ordering::Relaxed) {
+            let start = Instant::now();
+            let result = client.simple_query("SELECT 1").await;
+            let elapsed = start.elapsed().as_secs_f64();
+            if elapsed > 0.2 {
+                eprintln!(
+                    "SLOW unrelated at={} elapsed_ms={:.3}",
+                    chrono::Utc::now(),
+                    elapsed * 1000.
+                );
+            }
+            task_samples
+                .lock()
+                .unwrap()
+                .push((elapsed, result.err().map(|e| e.to_string())));
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        drop(client);
+    });
+    fn rss() -> u64 {
+        std::fs::read_to_string("/proc/self/status")
+            .unwrap()
+            .lines()
+            .find_map(|line| {
+                line.strip_prefix("VmRSS:")
+                    .and_then(|s| s.split_whitespace().next())
+                    .and_then(|s| s.parse::<u64>().ok())
+            })
+            .unwrap()
+            * 1024
+    }
+    let peak = Arc::new(std::sync::atomic::AtomicU64::new(rss()));
+    let sampler_peak = peak.clone();
+    let sampler_stop = stop.clone();
+    let sampler = tokio::spawn(async move {
+        while !sampler_stop.load(Ordering::Relaxed) {
+            sampler_peak.fetch_max(rss(), Ordering::Relaxed);
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    });
+    submit(address,"POST","sources","scale-register",json!({"id":"scale","kind":"postgres","catalog_alias":"scale","secret_ref":"file:scale.dsn","default_schema":schema,"allowed_schemas":[schema],"read_only":true})).await;
+    let mut source_task = None;
+    let mut source_driver = None;
+    let mut end_rss = Vec::new();
+    let mut oid = None;
+    for round in 0..=rounds {
+        let source = get(address, "sources/scale").await;
+        let start = Instant::now();
+        let path = if round == 0 {
+            "sources/scale/apply"
+        } else {
+            "sources/scale/refresh"
+        };
+        let (status, operation) = http(
+            address,
+            "POST",
+            path,
+            Some(&format!("scale-{round}")),
+            json!({"target":target(&source)}),
+        )
+        .await;
+        assert_eq!(status, 202, "{operation}");
+        let result = tokio::time::timeout(Duration::from_secs(600), async {
+            loop {
+                let op = get(
+                    address,
+                    &format!("operations/{}", operation["id"].as_str().unwrap()),
+                )
+                .await;
+                if ["Succeeded", "Failed", "Interrupted"].contains(&op["status"].as_str().unwrap())
+                {
+                    break op;
+                }
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(result["status"], "Succeeded", "{result}");
+        if round == 0 {
+            let (reader, connection) = login.connect(tokio_postgres::NoTls).await.unwrap();
+            source_driver = Some(tokio::spawn(async move {
+                connection.await.unwrap();
+            }));
+            let stop = stop.clone();
+            let samples = samples.clone();
+            source_task = Some(tokio::spawn(async move {
+                while !stop.load(Ordering::Relaxed) {
+                    let start = Instant::now();
+                    let result = reader.query_one("SELECT c0 FROM business.t_0", &[]).await;
+                    let error = match result {
+                        Ok(row) => {
+                            assert_eq!(row.get::<_, i32>(0), 7);
+                            None
+                        }
+                        Err(error) => Some(error.to_string()),
+                    };
+                    let elapsed = start.elapsed().as_secs_f64();
+                    if elapsed > 0.2 {
+                        eprintln!(
+                            "SLOW business at={} elapsed_ms={:.3}",
+                            chrono::Utc::now(),
+                            elapsed * 1000.
+                        );
+                    }
+                    samples.lock().unwrap().push((elapsed, error));
+                    tokio::time::sleep(Duration::from_millis(20)).await;
+                }
+                drop(reader);
+            }));
+        }
+        let page = get(
+            address,
+            "sources/scale/catalog?object=t_0&include=core,column_properties",
+        )
+        .await;
+        assert_eq!(
+            page["objects"][0]["columns"].as_array().unwrap().len(),
+            columns
+        );
+        assert_eq!(
+            page["objects"][0]["metadata"]["columns"]
+                .as_object()
+                .unwrap()
+                .len(),
+            columns
+        );
+        let current = page["objects"][0]["metadata"]["oid"].as_u64().unwrap();
+        if let Some(oid) = oid {
+            assert_eq!(current, oid);
+        } else {
+            oid = Some(current);
+        }
+        let all = get(address, "sources/scale/catalog?limit=1").await;
+        assert_eq!(all["total"], objects);
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        let memory = rss();
+        end_rss.push(memory);
+        eprintln!(
+            "SCALE round={round} objects={objects} columns={} elapsed_s={:.3} rss_mb={:.1} peak_rss_mb={:.1}",
+            objects * columns,
+            start.elapsed().as_secs_f64(),
+            memory as f64 / 1048576.,
+            peak.load(Ordering::Relaxed) as f64 / 1048576.
+        );
+    }
+    stop.store(true, Ordering::Relaxed);
+    query.await.unwrap();
+    if let Some(task) = source_task {
+        task.await.unwrap();
+    }
+    if let Some(task) = source_driver {
+        task.await.unwrap();
+    }
+    sampler.await.unwrap();
+    driver.await.unwrap();
+    let (catalog_reader, connection) = login.connect(tokio_postgres::NoTls).await.unwrap();
+    let catalog_driver = tokio::spawn(async move {
+        connection.await.unwrap();
+    });
+    let projected_columns: i64 = catalog_reader.query_one(
+        "SELECT count(*)::BIGINT FROM pg_catalog.pg_attribute a JOIN pg_catalog.pg_class c ON a.attrelid=c.oid WHERE c.relkind='f' AND a.attnum>0 AND NOT a.attisdropped",
+        &[],
+    ).await.unwrap().get(0);
+    assert_eq!(projected_columns, (objects * columns) as i64);
+    drop(catalog_reader);
+    catalog_driver.await.unwrap();
+    let samples = samples.lock().unwrap().clone();
+    let mut times = samples.iter().map(|s| s.0).collect::<Vec<_>>();
+    times.sort_by(f64::total_cmp);
+    let p95 = times[(times.len() - 1) * 95 / 100];
+    let p99 = times[(times.len() - 1) * 99 / 100];
+    let max = *times.last().unwrap();
+    let errors = samples.iter().filter(|s| s.1.is_some()).collect::<Vec<_>>();
+    eprintln!(
+        "SCALE queries={} baseline_p99_ms={:.3} p95_ms={:.3} p99_ms={:.3} max_ms={:.3} errors={} peak_rss_mb={:.1}",
+        times.len(),
+        baseline_p99 * 1000.,
+        p95 * 1000.,
+        p99 * 1000.,
+        max * 1000.,
+        errors.len(),
+        peak.load(Ordering::Relaxed) as f64 / 1048576.
+    );
+    engine.shutdown_until_drained().await.unwrap();
+    assert_eq!(engine.metrics().active_workers, 0);
+    assert_eq!(engine.handle.task_metrics().tasks, 0);
+    drop(engine);
+    admin
+        .batch_execute(&format!("DROP SCHEMA {schema} CASCADE"))
+        .await
+        .unwrap();
+    drop(admin);
+    admin_driver.await.unwrap();
+    assert!(errors.is_empty(), "query failures: {errors:?}");
+    assert!(max <= 1., "query pause exceeded 1 second: {max}");
+    assert!(
+        p99 <= baseline_p99 + 0.1,
+        "p99 regression: baseline={baseline_p99}, actual={p99}"
+    );
+    assert!(
+        peak.load(Ordering::Relaxed) <= rss_limit,
+        "RSS exceeded explicit process budget"
+    );
+    let tail = &end_rss[end_rss.len() - 3..];
+    assert!(
+        tail.iter().max().unwrap() - tail.iter().min().unwrap() <= 64 * 1024 * 1024,
+        "RSS did not stabilize: {end_rss:?}"
+    );
 }

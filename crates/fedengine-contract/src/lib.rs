@@ -414,12 +414,29 @@ impl Drop for GaugeGuard {
 /// A short local transaction. The closure must never perform network I/O or wait for locks.
 pub type ManagementUpdate =
     Box<dyn FnOnce(&mut fedengine_core::ManagementState) -> Result<()> + Send>;
+/// An uncommitted local publication. Drop aborts it; commit retains ownership until actual exit.
+#[async_trait::async_trait]
+pub trait PreparedPublication: Send {
+    async fn commit(
+        self: Box<Self>,
+        ownership: Box<dyn Send>,
+        published: Box<dyn FnOnce() + Send>,
+    ) -> Result<()>;
+}
 #[derive(Clone)]
 pub struct ManagementStorage {
     pub port: Arc<dyn ManagementStore>,
 }
 #[async_trait::async_trait]
 pub trait ManagementStore: Send + Sync {
+    /// Prepare source-scoped identities and projections while existing readers use committed heads.
+    async fn prepare_publication(
+        &self,
+        incarnation: String,
+        update: ManagementUpdate,
+        ownership: Box<dyn Send>,
+    ) -> Result<Box<dyn PreparedPublication>>;
+
     async fn read(&self) -> Result<fedengine_core::ManagementState>;
     async fn update(&self, update: ManagementUpdate) -> Result<fedengine_core::ManagementState>;
     /// Caller transfers the instance barrier and service leases to the actual writer task.
@@ -439,7 +456,7 @@ pub trait ManagementStore: Send + Sync {
     async fn relation_names(
         &self,
         _snapshot: String,
-    ) -> Result<std::collections::BTreeSet<(String, String)>> {
+    ) -> Result<Arc<std::collections::BTreeSet<(String, String)>>> {
         Err(EngineError::unsupported(
             "catalog name reader is unavailable",
         ))
@@ -497,16 +514,12 @@ pub struct RuntimeControl {
 }
 #[derive(Clone)]
 pub enum ControlAction {
-    Inspect {
-        revision: fedengine_core::SourceRevision,
-        reuse_attached: bool,
-    },
-    Switch {
+    /// Short live mount mutation after isolated preparation; no metadata scan.
+    Mount {
         previous: Option<fedengine_core::SourceRevision>,
-        next: fedengine_core::SourceRevision,
+        next: Option<fedengine_core::SourceRevision>,
     },
-    Disable(fedengine_core::SourceRevision),
-    Refresh(fedengine_core::SourceRevision),
+    ClearCache(fedengine_core::SourceRevision),
 }
 pub struct ControlOutcome {
     pub schemas: Vec<String>,
@@ -517,6 +530,20 @@ pub struct ControlOutcome {
 }
 #[async_trait::async_trait]
 pub trait RuntimeControlPort: Send + Sync {
+    /// Isolated remote collection; never changes live attachments or extension caches.
+    async fn capture(
+        &self,
+        revision: fedengine_core::SourceRevision,
+        cancel: CancellationToken,
+        ownership: Box<dyn Send>,
+    ) -> Result<fedengine_core::CatalogSnapshot>;
+
+    async fn inspect(
+        &self,
+        revision: fedengine_core::SourceRevision,
+        cancel: CancellationToken,
+        ownership: Box<dyn Send>,
+    ) -> Result<ControlOutcome>;
     /// Caller owns the instance write barrier, then sorted source locks.
     /// Ownership (including service leases) survives until blocking I/O really exits.
     async fn control(

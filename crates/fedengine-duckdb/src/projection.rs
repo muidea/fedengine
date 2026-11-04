@@ -776,6 +776,10 @@ pub(super) fn publish(conn: &Connection, snapshot: &CatalogSnapshot, alias: &str
                 }
             }
         }
+        // Flush complete object groups so FK visibility annotations remain atomic.
+        if rows.values().map(Vec::len).sum::<usize>() >= 4096 {
+            insert(conn, std::mem::take(&mut rows))?;
+        }
     }
     insert(conn, rows)?;
     conn.execute(

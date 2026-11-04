@@ -294,6 +294,13 @@ impl Config {
             }
         }
         let m = &self.management;
+        // Static sources also use the metadata collector after confirmed DDL.
+        if !(32..=16384).contains(&m.metadata_memory_budget_mb)
+            || !(32..=4096).contains(&m.metadata_operation_memory_mb)
+            || m.metadata_operation_memory_mb > m.metadata_memory_budget_mb
+        {
+            return Err(EngineError::config("invalid metadata memory bounds"));
+        }
         if m.enabled {
             if d.database_path.is_empty() || d.database_path == ":memory:" {
                 return Err(EngineError::config(

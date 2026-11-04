@@ -170,37 +170,55 @@ impl Lifecycle for CatalogFixture {
         let storage: ServiceHandle<ManagementStorage> = ctx
             .services
             .get(&ComponentRef::initiator("duckdb-instance"), "storage")?;
-        storage
+        let incarnation = storage
             .acquire()?
             .port
-            .update(Box::new(|state| {
-                let source = state
-                    .sources
-                    .values_mut()
-                    .find(|s| s.id.0 == "protocol_fixture")
-                    .unwrap();
-                source.status = SourceStatus::Active;
-                source.applied_revision = Some(source.desired_revision);
-                source.catalog_snapshot = Some("protocol-snapshot".into());
-                // Retain the disabled intent: this fixture never reconnects to a
-                // remote database during persistent management-test recovery.
-                let snapshot = CatalogSnapshot {
-                    id: "protocol-snapshot".into(),
-                    incarnation: source.incarnation.clone(),
-                    revision: source.desired_revision,
-                    generation: 1,
-                    database_oid: 0,
-                    schema_oids: Default::default(),
-                    refreshed_at: "fixture".into(),
-                    complete: true,
-                    stale: false,
-                    structure_digest: "fixture".into(),
-                    schemas: vec!["public".into()],
-                    objects: vec![],
-                };
-                state.catalogs.insert(snapshot.id.clone(), snapshot);
-                Ok(())
-            }))
+            .read()
+            .await
+            .map_err(|e| FrameworkError::InvalidConfig(e.to_string()))?
+            .source(&DataSourceId("protocol_fixture".into()))
+            .map_err(|e| FrameworkError::InvalidConfig(e.to_string()))?
+            .incarnation
+            .clone();
+        let prepared = storage
+            .acquire()?
+            .port
+            .prepare_publication(
+                incarnation,
+                Box::new(|state| {
+                    let source = state
+                        .sources
+                        .values_mut()
+                        .find(|s| s.id.0 == "protocol_fixture")
+                        .unwrap();
+                    source.status = SourceStatus::Active;
+                    source.applied_revision = Some(source.desired_revision);
+                    source.catalog_snapshot = Some("protocol-snapshot".into());
+                    // Retain the disabled intent: this fixture never reconnects to a
+                    // remote database during persistent management-test recovery.
+                    let snapshot = CatalogSnapshot {
+                        id: "protocol-snapshot".into(),
+                        incarnation: source.incarnation.clone(),
+                        revision: source.desired_revision,
+                        generation: 1,
+                        database_oid: 0,
+                        schema_oids: Default::default(),
+                        refreshed_at: "fixture".into(),
+                        complete: true,
+                        stale: false,
+                        structure_digest: "fixture".into(),
+                        schemas: vec!["public".into()],
+                        objects: vec![],
+                    };
+                    state.catalogs.insert(snapshot.id.clone(), snapshot);
+                    Ok(())
+                }),
+                Box::new(storage.acquire()?),
+            )
+            .await
+            .map_err(|e| FrameworkError::InvalidConfig(e.to_string()))?;
+        prepared
+            .commit(Box::new(()), Box::new(|| {}))
             .await
             .map_err(|e| FrameworkError::InvalidConfig(e.to_string()))?;
         Ok(())

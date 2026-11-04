@@ -4,7 +4,11 @@ use fedengine_core::*;
 use fedengine_datasource::DataSourceRegistry;
 use fedengine_ddl::{IndexOwner, ObjectRef};
 use modorch::{prelude::*, *};
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    num::NonZeroUsize,
+    sync::Arc,
+};
 pub const CATALOG_TOPIC: &str = "catalog/control/v1";
 #[derive(Clone)]
 pub enum CatalogRequest {
@@ -19,7 +23,7 @@ pub enum CatalogReply {
     Indexes(Vec<IndexOwner>),
     Directory(CatalogPage),
     Headers(CatalogHeads),
-    Names(std::collections::BTreeSet<(String, String)>),
+    Names(Arc<BTreeSet<(String, String)>>),
 }
 pub struct CatalogFactory {
     pub managed: bool,
@@ -32,6 +36,9 @@ struct CatalogModule {
 }
 fn descriptor(managed: bool) -> ComponentDescriptor {
     let mut d = ComponentDescriptor::new(ComponentRef::module("catalog-manager"));
+    d.execution = ExecutionPolicy::Concurrent {
+        max_in_flight: NonZeroUsize::new(16).unwrap(),
+    };
     d.requires.extend([
         ComponentRef::initiator("datasource-registry"),
         ComponentRef::initiator("duckdb-runtime"),
@@ -79,8 +86,9 @@ impl Module for CatalogModule {
         descriptor(self.managed)
     }
     fn handlers(&mut self) -> FrameworkResult<Option<HandlerRegistration>> {
-        Ok(Some(HandlerRegistration::Serial {
-            handler: Box::new(CatalogHandler {
+        Ok(Some(HandlerRegistration::Concurrent {
+            max_in_flight: NonZeroUsize::new(16).unwrap(),
+            handler: Arc::new(CatalogHandler {
                 registry: self.registry.clone().unwrap(),
                 runtime: self.runtime.clone().unwrap(),
                 storage: self.storage.clone(),
@@ -99,9 +107,9 @@ struct CatalogHandler {
     storage: Option<ServiceHandle<ManagementStorage>>,
 }
 #[async_trait]
-impl SerialHandler for CatalogHandler {
+impl ConcurrentHandler for CatalogHandler {
     async fn handle(
-        &mut self,
+        &self,
         _: &HandlerContext,
         message: MessageEnvelope,
     ) -> FrameworkResult<HandlerReply> {

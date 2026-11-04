@@ -55,6 +55,7 @@ impl Lifecycle for InstanceInitiator {
                     root,
                     tasks: ctx.tasks.clone(),
                     writer: Arc::new(tokio::sync::Mutex::new(())),
+                    views: Arc::new(Mutex::new(crate::storage::CatalogViews::default())),
                 }),
             }));
         }
@@ -127,6 +128,14 @@ pub(super) fn initialize_local(config: &Config) -> FrameworkResult<Connection> {
     ))
     .map_err(engine_error)
     .map_err(fw)?;
+    if d.database_path != ":memory:" {
+        // Publication performs a passive checkpoint after releasing its instance
+        // barrier. Keep ordinary directory commits below the automatic threshold;
+        // the WAL remains durable and automatic checkpointing is still a fallback.
+        conn.execute_batch("SET checkpoint_threshold='1GB'")
+            .map_err(engine_error)
+            .map_err(fw)?;
+    }
     crate::functions::register(&conn)
         .map_err(engine_error)
         .map_err(fw)?;

@@ -49,6 +49,9 @@ impl Lifecycle for SourceManager {
             control: ctx
                 .services
                 .get(&ComponentRef::initiator("duckdb-runtime"), "control")?,
+            memory: Arc::new(tokio::sync::Semaphore::new(
+                self.config.management.metadata_memory_budget_mb as usize,
+            )),
             slots: Arc::new(tokio::sync::Semaphore::new(
                 self.config.management.max_concurrent_operations,
             )),

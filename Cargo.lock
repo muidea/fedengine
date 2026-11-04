@@ -791,6 +791,7 @@ dependencies = [
  "fedengine-core",
  "fedengine-datasource",
  "fedengine-pg-compat",
+ "flate2",
  "modorch",
  "serde",
  "serde_json",
@@ -811,6 +812,7 @@ dependencies = [
  "fedengine-contract",
  "fedengine-core",
  "fedengine-datasource",
+ "flate2",
  "modorch",
  "serde",
  "serde_json",
@@ -882,6 +884,7 @@ dependencies = [
  "fedengine-policy",
  "modorch",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

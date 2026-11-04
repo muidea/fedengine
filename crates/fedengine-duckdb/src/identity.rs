@@ -1,8 +1,8 @@
 //! Durable local identities. Called inside the management writer's transaction only.
 use crate::error::engine_error;
-use duckdb::{Connection, OptionalExt, params};
+use duckdb::{Connection, OptionalExt, appender_params_from_iter, params};
 use fedengine_core::*;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 
 pub(super) fn initialize(conn: &Connection) -> Result<()> {
     conn.execute_batch("CREATE SEQUENCE IF NOT EXISTS _fedengine.metadata_oid_seq START 200000000 MAXVALUE 2147483647 NO CYCLE;
@@ -33,83 +33,236 @@ pub(super) fn oid(conn: &Connection, epoch: &str, parts: &[&str]) -> Result<u32>
     conn.execute("INSERT INTO _fedengine.object_identity VALUES (?,?,?,false) ON CONFLICT(identity_key) DO UPDATE SET oid=excluded.oid,retired=false", params![key,epoch,next]).map_err(engine_error)?;
     Ok(next)
 }
-fn attnums(conn: &Connection, object: &mut CatalogObject) -> Result<()> {
-    let table = object.metadata.oid;
-    let mut old = conn.prepare("SELECT name,attnum,source_id FROM _fedengine.column_identity WHERE table_oid=? AND NOT retired").map_err(engine_error)?;
-    let old = old
-        .query_map([table], |r| {
-            Ok((
-                r.get::<_, String>(0)?,
-                r.get::<_, i16>(1)?,
-                r.get::<_, Option<String>>(2)?,
-            ))
-        })
-        .map_err(engine_error)?
-        .collect::<std::result::Result<Vec<_>, _>>()
-        .map_err(engine_error)?;
-    let mut max: i32 = conn.query_row("SELECT coalesce(max(attnum),0)::INTEGER FROM _fedengine.column_identity WHERE table_oid=?", [table], |r| r.get(0)).map_err(engine_error)?;
-    let mut keep = BTreeSet::new();
-    for col in &object.columns {
-        let props = object.metadata.columns.entry(col.name.clone()).or_default();
-        let matched = old
-            .iter()
-            .find(|(name, _, source)| match (&props.source_id, source) {
-                (Some(want), Some(have)) => want == have,
-                _ => name == &col.name,
-            });
-        let attnum = if let Some((_, num, _)) = matched {
-            *num
-        } else {
-            max += 1;
-            i16::try_from(max)
-                .map_err(|_| EngineError::new("54000", "column identity space exhausted"))?
-        };
-        if !keep.insert(attnum) {
-            return Err(EngineError::new("55000", "duplicate column identity"));
-        }
-        props.attnum = attnum;
-        if props.default.is_some() || props.generated.is_some() {
-            props.default_oid = oid(conn, &format!("default:{table}"), &[&attnum.to_string()])?;
-        }
-        props.type_oid = match col
-            .mapped_type
-            .as_ref()
-            .and_then(|t| crate::codec::type_name(t).ok())
-        {
-            Some(t) => t.oid(),
-            None => oid(
-                conn,
-                &format!("type:{table}"),
-                &["unsupported_type", &col.remote_type],
-            )?,
-        };
-        props.type_modifier = col
-            .mapped_type
-            .as_ref()
-            .map(|t| crate::codec::type_modifier(t))
-            .unwrap_or(-1);
-        conn.execute(
-            "INSERT OR REPLACE INTO _fedengine.column_identity VALUES (?,?,?,?,false)",
-            params![table, col.name, attnum, props.source_id],
-        )
-        .map_err(engine_error)?;
-    }
-    for (_, num, _) in old {
-        if !keep.contains(&num) {
-            conn.execute(
-                "UPDATE _fedengine.column_identity SET retired=true WHERE table_oid=? AND attnum=?",
-                params![table, num],
-            )
+/// Source-scoped identity working set; all changes remain in the caller's transaction.
+pub(super) struct OidBatch<'a> {
+    conn: &'a Connection,
+    known: HashMap<String, (u32, bool)>,
+    pending: Vec<(String, String, u32)>,
+    reserved: Vec<u32>,
+}
+impl<'a> OidBatch<'a> {
+    pub(super) fn load(conn: &'a Connection, epochs: &[String]) -> Result<Self> {
+        conn.execute_batch("CREATE OR REPLACE TEMP TABLE __fed_identity_epochs(epoch VARCHAR)")
             .map_err(engine_error)?;
+        {
+            let mut app = conn
+                .appender_to_db("__fed_identity_epochs", "main")
+                .map_err(engine_error)?;
+            for epoch in epochs {
+                app.append_row([epoch]).map_err(engine_error)?;
+            }
+            app.flush().map_err(engine_error)?;
         }
+        let mut stmt = conn.prepare("SELECT identity_key,oid,retired FROM _fedengine.object_identity WHERE epoch IN (SELECT epoch FROM __fed_identity_epochs) OR epoch IN (SELECT 'default:'||oid FROM _fedengine.object_identity WHERE epoch IN (SELECT epoch FROM __fed_identity_epochs)) OR epoch IN (SELECT 'type:'||oid FROM _fedengine.object_identity WHERE epoch IN (SELECT epoch FROM __fed_identity_epochs))").map_err(engine_error)?;
+        let mut rows = stmt.query([]).map_err(engine_error)?;
+        let mut known = HashMap::new();
+        while let Some(row) = rows.next().map_err(engine_error)? {
+            known.insert(
+                row.get(0).map_err(engine_error)?,
+                (
+                    row.get(1).map_err(engine_error)?,
+                    row.get(2).map_err(engine_error)?,
+                ),
+            );
+        }
+        Ok(Self {
+            conn,
+            known,
+            pending: Vec::new(),
+            reserved: Vec::new(),
+        })
     }
-    let mut stmt=conn.prepare("SELECT attnum FROM _fedengine.column_identity WHERE table_oid=? AND retired ORDER BY attnum").map_err(engine_error)?;
-    object.metadata.dropped_attnums = stmt
-        .query_map([table], |r| r.get(0))
-        .map_err(engine_error)?
-        .collect::<std::result::Result<Vec<_>, _>>()
-        .map_err(engine_error)?;
-    Ok(())
+    pub(super) fn oid(&mut self, epoch: &str, parts: &[&str]) -> Result<u32> {
+        let key = serde_json::to_string(&(epoch, parts))
+            .map_err(|_| EngineError::new("XX000", "invalid identity"))?;
+        if let Some((oid, false)) = self.known.get(&key) {
+            return Ok(*oid);
+        }
+        if self.reserved.is_empty() {
+            // Reserve bounded batches. Sequence gaps after rollback are intentional; never recycle.
+            let mut stmt = self
+                .conn
+                .prepare("SELECT nextval('_fedengine.metadata_oid_seq')::UINTEGER FROM range(1024)")
+                .map_err(engine_error)?;
+            self.reserved = stmt
+                .query_map([], |r| r.get(0))
+                .map_err(engine_error)?
+                .collect::<std::result::Result<Vec<_>, _>>()
+                .map_err(engine_error)?;
+        }
+        let oid = self.reserved.pop().unwrap();
+        self.known.insert(key.clone(), (oid, false));
+        self.pending.push((key, epoch.into(), oid));
+        Ok(oid)
+    }
+    pub(super) fn flush(self) -> Result<()> {
+        if self.pending.is_empty() {
+            return Ok(());
+        }
+        self.conn.execute_batch("CREATE OR REPLACE TEMP TABLE __fed_identity_new(identity_key VARCHAR,epoch VARCHAR,oid UINTEGER)").map_err(engine_error)?;
+        {
+            let mut app = self
+                .conn
+                .appender_to_db("__fed_identity_new", "main")
+                .map_err(engine_error)?;
+            for (key, epoch, oid) in self.pending {
+                use duckdb::types::Value as V;
+                app.append_row(appender_params_from_iter([
+                    V::Text(key),
+                    V::Text(epoch),
+                    V::UInt(oid),
+                ]))
+                .map_err(engine_error)?;
+            }
+            app.flush().map_err(engine_error)?;
+        }
+        self.conn.execute_batch("INSERT INTO _fedengine.object_identity SELECT identity_key,epoch,oid,false FROM __fed_identity_new ON CONFLICT(identity_key) DO UPDATE SET oid=excluded.oid,retired=false; DROP TABLE __fed_identity_new").map_err(engine_error)
+    }
+}
+#[derive(Default)]
+struct ColumnHistory {
+    entries: Vec<(String, i16, Option<String>, bool)>,
+    max: i32,
+}
+struct ColumnBatch {
+    histories: HashMap<u32, ColumnHistory>,
+    changed: Vec<(u32, String, i16, Option<String>, bool)>,
+}
+impl ColumnBatch {
+    fn load(conn: &Connection, tables: impl Iterator<Item = u32>) -> Result<Self> {
+        conn.execute_batch("CREATE OR REPLACE TEMP TABLE __fed_identity_tables(oid UINTEGER)")
+            .map_err(engine_error)?;
+        {
+            let mut app = conn
+                .appender_to_db("__fed_identity_tables", "main")
+                .map_err(engine_error)?;
+            for oid in tables {
+                app.append_row([oid]).map_err(engine_error)?;
+            }
+            app.flush().map_err(engine_error)?;
+        }
+        let mut stmt=conn.prepare("SELECT table_oid,name,attnum,source_id,retired FROM _fedengine.column_identity WHERE table_oid IN (SELECT oid FROM __fed_identity_tables)").map_err(engine_error)?;
+        let mut rows = stmt.query([]).map_err(engine_error)?;
+        let mut histories: HashMap<u32, ColumnHistory> = HashMap::new();
+        while let Some(r) = rows.next().map_err(engine_error)? {
+            let h = histories
+                .entry(r.get(0).map_err(engine_error)?)
+                .or_default();
+            let num: i16 = r.get(2).map_err(engine_error)?;
+            h.max = h.max.max(num.into());
+            h.entries.push((
+                r.get(1).map_err(engine_error)?,
+                num,
+                r.get(3).map_err(engine_error)?,
+                r.get(4).map_err(engine_error)?,
+            ));
+        }
+        Ok(Self {
+            histories,
+            changed: Vec::new(),
+        })
+    }
+    fn assign(&mut self, oids: &mut OidBatch<'_>, object: &mut CatalogObject) -> Result<()> {
+        let table = object.metadata.oid;
+        let history = self.histories.entry(table).or_default();
+        let names: HashMap<_, _> = history
+            .entries
+            .iter()
+            .filter(|e| !e.3)
+            .map(|e| (e.0.as_str(), e))
+            .collect();
+        let sources: HashMap<_, _> = history
+            .entries
+            .iter()
+            .filter(|e| !e.3)
+            .filter_map(|e| e.2.as_deref().map(|s| (s, e)))
+            .collect();
+        let mut keep = BTreeSet::new();
+        for col in &object.columns {
+            let props = object.metadata.columns.entry(col.name.clone()).or_default();
+            // Source identity wins. Name fallback is only allowed when either side lacks it.
+            let matched = props
+                .source_id
+                .as_deref()
+                .and_then(|s| sources.get(s).copied())
+                .or_else(|| {
+                    names
+                        .get(col.name.as_str())
+                        .copied()
+                        .filter(|e| props.source_id.is_none() || e.2.is_none())
+                });
+            let num = if let Some(e) = matched {
+                e.1
+            } else {
+                history.max += 1;
+                i16::try_from(history.max)
+                    .map_err(|_| EngineError::new("54000", "column identity space exhausted"))?
+            };
+            if !keep.insert(num) {
+                return Err(EngineError::new("55000", "duplicate column identity"));
+            }
+            props.attnum = num;
+            if props.default.is_some() || props.generated.is_some() {
+                props.default_oid = oids.oid(&format!("default:{table}"), &[&num.to_string()])?;
+            }
+            props.type_oid = match col
+                .mapped_type
+                .as_ref()
+                .and_then(|t| crate::codec::type_name(t).ok())
+            {
+                Some(t) => t.oid(),
+                None => oids.oid(
+                    &format!("type:{table}"),
+                    &["unsupported_type", &col.remote_type],
+                )?,
+            };
+            props.type_modifier = col
+                .mapped_type
+                .as_ref()
+                .map(|t| crate::codec::type_modifier(t))
+                .unwrap_or(-1);
+            if matched.is_none_or(|e| e.0 != col.name || e.2 != props.source_id) {
+                self.changed
+                    .push((table, col.name.clone(), num, props.source_id.clone(), false));
+            }
+        }
+        object.metadata.dropped_attnums.clear();
+        for e in &history.entries {
+            if !keep.contains(&e.1) {
+                object.metadata.dropped_attnums.push(e.1);
+                if !e.3 {
+                    self.changed
+                        .push((table, e.0.clone(), e.1, e.2.clone(), true));
+                }
+            }
+        }
+        object.metadata.dropped_attnums.sort_unstable();
+        Ok(())
+    }
+    fn flush(self, conn: &Connection) -> Result<()> {
+        if self.changed.is_empty() {
+            return Ok(());
+        }
+        conn.execute_batch("CREATE OR REPLACE TEMP TABLE __fed_columns_new(table_oid UINTEGER,name VARCHAR,attnum SMALLINT,source_id VARCHAR,retired BOOLEAN)").map_err(engine_error)?;
+        {
+            let mut app = conn
+                .appender_to_db("__fed_columns_new", "main")
+                .map_err(engine_error)?;
+            for (oid, name, num, source, retired) in self.changed {
+                use duckdb::types::Value as V;
+                app.append_row(appender_params_from_iter([
+                    V::UInt(oid),
+                    V::Text(name),
+                    V::SmallInt(num),
+                    source.map(V::Text).unwrap_or(V::Null),
+                    V::Boolean(retired),
+                ]))
+                .map_err(engine_error)?;
+            }
+            app.flush().map_err(engine_error)?;
+        }
+        conn.execute_batch("INSERT OR REPLACE INTO _fedengine.column_identity SELECT * FROM __fed_columns_new; DROP TABLE __fed_columns_new").map_err(engine_error)
+    }
 }
 fn retained_categories(old: &CatalogObject, new: &mut CatalogObject) {
     let complete = |category: &str| {
@@ -285,38 +438,38 @@ pub(super) fn prepare(
                         || old_epochs.get(&c.id).and_then(Option::as_ref) == Some(&epoch))
             })
             .max_by_key(|c| &c.refreshed_at);
-        snapshot.database_oid = oid(conn, &snapshot.incarnation, &["database"])?;
+        let mut oids = OidBatch::load(conn, &[epoch.clone(), snapshot.incarnation.clone()])?;
+        snapshot.database_oid = oids.oid(&snapshot.incarnation, &["database"])?;
+        let previous_objects: HashMap<_, _> = previous
+            .into_iter()
+            .flat_map(|c| &c.objects)
+            .map(|o| (o.metadata.oid, o))
+            .collect();
+        for object in &mut snapshot.objects {
+            let key = object.metadata.source_id.as_deref().unwrap_or(&object.name);
+            object.metadata.oid = if object.metadata.source_id.is_some() {
+                oids.oid(&epoch, &["relation", "remote", key])?
+            } else {
+                oids.oid(&epoch, &["relation", "name", &object.schema, key])?
+            };
+        }
+        let mut columns = ColumnBatch::load(conn, snapshot.objects.iter().map(|o| o.metadata.oid))?;
         let mut active = BTreeSet::new();
         for schema in &snapshot.schemas {
-            let id = oid(conn, &epoch, &["schema", schema])?;
+            let id = oids.oid(&epoch, &["schema", schema])?;
             snapshot.schema_oids.insert(schema.clone(), id);
             active.insert(id);
         }
         for object in &mut snapshot.objects {
-            let key = object
-                .metadata
-                .source_id
-                .clone()
-                .unwrap_or_else(|| object.name.clone());
-            object.metadata.oid = if object.metadata.source_id.is_some() {
-                oid(conn, &epoch, &["relation", "remote", &key])?
-            } else {
-                oid(conn, &epoch, &["relation", "name", &object.schema, &key])?
-            };
             active.insert(object.metadata.oid);
-            if let Some(old) = previous.and_then(|c| {
-                c.objects
-                    .iter()
-                    .find(|o| o.metadata.oid == object.metadata.oid)
-            }) {
+            if let Some(old) = previous_objects.get(&object.metadata.oid) {
                 retained_categories(old, object);
             }
-            attnums(conn, object)?;
+            columns.assign(&mut oids, object)?;
             object.metadata.validate(&object.columns)?;
             for c in &mut object.metadata.constraints {
                 let key = c.source_id.as_deref().unwrap_or(&c.name);
-                c.oid = oid(
-                    conn,
+                c.oid = oids.oid(
                     &epoch,
                     &["constraint", &object.metadata.oid.to_string(), key],
                 )?;
@@ -324,32 +477,36 @@ pub(super) fn prepare(
             }
             for i in &mut object.metadata.indexes {
                 let key = i.source_id.as_deref().unwrap_or(&i.name);
-                i.oid = oid(
-                    conn,
-                    &epoch,
-                    &["index", &object.metadata.oid.to_string(), key],
-                )?;
+                i.oid = oids.oid(&epoch, &["index", &object.metadata.oid.to_string(), key])?;
                 active.insert(i.oid);
             }
         }
-        if let Some(previous) = previous {
-            for old in previous
-                .objects
-                .iter()
-                .filter(|o| snapshot.schemas.contains(&o.schema))
-            {
-                let ids = std::iter::once(old.metadata.oid)
-                    .chain(old.metadata.constraints.iter().map(|c| c.oid))
-                    .chain(old.metadata.indexes.iter().map(|i| i.oid));
-                for id in ids.filter(|id| !active.contains(id)) {
-                    conn.execute(
-                        "UPDATE _fedengine.object_identity SET retired=true WHERE oid=?",
-                        [id],
-                    )
-                    .map_err(engine_error)?;
+        oids.flush()?;
+        columns.flush(conn)?;
+        conn.execute_batch("CREATE OR REPLACE TEMP TABLE __fed_retired(oid UINTEGER)")
+            .map_err(engine_error)?;
+        {
+            let mut app = conn
+                .appender_to_db("__fed_retired", "main")
+                .map_err(engine_error)?;
+            if let Some(previous) = previous {
+                for old in previous
+                    .objects
+                    .iter()
+                    .filter(|o| snapshot.schemas.contains(&o.schema))
+                {
+                    for id in std::iter::once(old.metadata.oid)
+                        .chain(old.metadata.constraints.iter().map(|c| c.oid))
+                        .chain(old.metadata.indexes.iter().map(|i| i.oid))
+                        .filter(|id| !active.contains(id))
+                    {
+                        app.append_row([id]).map_err(engine_error)?;
+                    }
                 }
             }
+            app.flush().map_err(engine_error)?;
         }
+        conn.execute_batch("UPDATE _fedengine.object_identity SET retired=true WHERE oid IN (SELECT oid FROM __fed_retired); DROP TABLE __fed_retired").map_err(engine_error)?;
         tracing::debug!(snapshot=%snapshot.id, objects=snapshot.objects.len(), elapsed_ms=started.elapsed().as_secs_f64()*1000., "catalog identity assignment finished");
     }
     Ok(())

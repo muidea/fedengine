@@ -16,3 +16,4 @@ fedengine-catalog.workspace = true
 fedengine-pg-compat.workspace = true
 modorch.workspace = true
 tokio.workspace = true
+tracing.workspace = true

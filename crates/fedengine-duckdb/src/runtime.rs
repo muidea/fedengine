@@ -87,7 +87,9 @@ impl ExecutionPort for DuckdbRuntime {
             let mut metadata=Some(meta_tx);
             let result=(||->Result<()>{
                 if request.cancel.is_cancelled(){return Err(EngineError::new("57014","query canceled before start"));}
+                let cloning = Instant::now();
                 let conn=root.lock().unwrap().try_clone().map_err(engine_error)?;
+                if cloning.elapsed()>Duration::from_millis(100) { tracing::debug!(elapsed_ms=cloning.elapsed().as_secs_f64()*1000., "query connection acquisition delayed"); }
                 conn.execute_batch(fedengine_pg_compat::EXECUTION_SETTINGS).map_err(engine_error)?;
                 *interrupt.lock().unwrap()=Some(conn.interrupt_handle());
                 if request.cancel.is_cancelled(){return Err(EngineError::new("57014","query canceled before execution"));}
@@ -211,13 +213,124 @@ impl ExecutionPort for DuckdbRuntime {
     }
 }
 
+impl DuckdbRuntime {
+    async fn isolated(
+        &self,
+        revision: SourceRevision,
+        cancel: CancellationToken,
+        ownership: Box<dyn Send>,
+        inspect: bool,
+    ) -> Result<ControlOutcome> {
+        let mut config = (*self.config).clone();
+        config.duckdb.database_path = ":memory:".into();
+        config.duckdb.threads = 1;
+        config.duckdb.memory_limit = format!(
+            "{}MB",
+            (config.management.metadata_operation_memory_mb / 2).min(128)
+        );
+        let directory = std::path::Path::new(&config.duckdb.temp_directory)
+            .join(format!("metadata-{}", uuid::Uuid::new_v4()));
+        config.duckdb.temp_directory = directory.to_string_lossy().into();
+        let handle = Arc::new(Mutex::new(None));
+        let monitor_handle = handle.clone();
+        let done = CancellationToken::new();
+        let monitor_done = done.clone();
+        let token = cancel.clone();
+        self.tasks.spawn(move |shutdown|async move {
+            tokio::select!{biased;_=monitor_done.cancelled()=>return Ok(()),_=token.cancelled()=>{},_=shutdown.cancelled()=>{}}
+            token.cancel();
+            interrupt_until_finished(monitor_handle,monitor_done).await;
+            Ok(())
+        }).map_err(framework_error)?;
+        let finished = done.drop_guard();
+        self.tasks
+            .spawn_blocking_io(move |_| {
+                let _finished = finished;
+                let _ownership = ownership;
+                struct Temporary(std::path::PathBuf);
+                impl Drop for Temporary {
+                    fn drop(&mut self) {
+                        let _ = std::fs::remove_dir_all(&self.0);
+                    }
+                }
+                let _directory = Temporary(directory);
+                Ok((|| {
+                    if cancel.is_cancelled() {
+                        return Err(EngineError::new("57014", "metadata capture canceled"));
+                    }
+                    let conn =
+                        crate::instance::initialize_local(&config).map_err(framework_error)?;
+                    *handle.lock().unwrap() = Some(conn.interrupt_handle());
+                    crate::control::attach(&conn, &config, &revision.effective_definition())?;
+                    if inspect {
+                        let schemas =
+                            crate::catalog::discover(&conn, &revision.effective_definition())?;
+                        return Ok(ControlOutcome {
+                            schemas,
+                            catalog: None,
+                            restored_previous: false,
+                            error: None,
+                        });
+                    }
+                    let mut revision = revision;
+                    if !config.management.enabled {
+                        // Static allowlists may include not-yet-created schemas.
+                        // A confirmed DROP SCHEMA must still refresh the remaining catalog.
+                        let available =
+                            crate::catalog::discover(&conn, &revision.effective_definition())?;
+                        revision
+                            .bindings
+                            .retain(|b| available.contains(&b.remote_schema));
+                    }
+                    let snapshot = crate::catalog::capture_bounded(
+                        &conn,
+                        &revision,
+                        (config.management.metadata_operation_memory_mb as usize) * 1024 * 1024 / 8,
+                    )?;
+                    if cancel.is_cancelled() {
+                        return Err(EngineError::new("57014", "metadata capture canceled"));
+                    }
+                    Ok(ControlOutcome {
+                        schemas: vec![],
+                        catalog: Some(snapshot),
+                        restored_previous: false,
+                        error: None,
+                    })
+                })())
+            })
+            .map_err(framework_error)?
+            .wait_finished()
+            .await
+            .map_err(framework_error)?
+    }
+}
 #[async_trait]
 impl RuntimeControlPort for DuckdbRuntime {
+    async fn capture(
+        &self,
+        revision: SourceRevision,
+        cancel: CancellationToken,
+        ownership: Box<dyn Send>,
+    ) -> Result<CatalogSnapshot> {
+        self.isolated(revision, cancel, ownership, false)
+            .await?
+            .catalog
+            .ok_or_else(|| EngineError::new("XX000", "collector returned no snapshot"))
+    }
+    async fn inspect(
+        &self,
+        revision: SourceRevision,
+        cancel: CancellationToken,
+        ownership: Box<dyn Send>,
+    ) -> Result<ControlOutcome> {
+        self.isolated(revision, cancel, ownership, true).await
+    }
     async fn control(
         &self,
         action: ControlAction,
         ownership: Box<dyn Send>,
     ) -> Result<ControlOutcome> {
+        let started = Instant::now();
         let root = self.root.clone();
         let config = self.config.clone();
         // Control work has independent scheduler quota; it never waits for query slots.
@@ -230,7 +343,12 @@ impl RuntimeControlPort for DuckdbRuntime {
                     .try_clone()
                     .map_err(engine_error)
                     .map_err(fw)?;
-                Ok(crate::control::execute(&conn, &config, action))
+                let result = crate::control::execute(&conn, &config, action);
+                tracing::debug!(
+                    elapsed_ms = started.elapsed().as_secs_f64() * 1000.,
+                    "management live instance mutation finished"
+                );
+                Ok(result)
             })
             .map_err(framework_error)?
             .wait_finished()

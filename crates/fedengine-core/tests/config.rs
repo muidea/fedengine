@@ -89,3 +89,30 @@ fn virtual_databases_share_strict_names_principals_and_binding_limits() {
     }];
     assert!(c.validate().is_err());
 }
+
+#[test]
+fn metadata_memory_limits_are_bounded_and_fit_the_shared_budget() {
+    let mut c = configuration();
+    c.management.enabled = true;
+    c.duckdb.database_path = "./data/config-test.duckdb".into();
+    for (global, operation, valid) in [
+        (32, 32, true),
+        (16384, 4096, true),
+        (31, 32, false),
+        (16385, 256, false),
+        (512, 31, false),
+        (8192, 4097, false),
+        (256, 512, false),
+    ] {
+        c.management.metadata_memory_budget_mb = global;
+        c.management.metadata_operation_memory_mb = operation;
+        for enabled in [true, false] {
+            c.management.enabled = enabled;
+            assert_eq!(
+                c.validate().is_ok(),
+                valid,
+                "enabled={enabled}, global={global}, operation={operation}"
+            );
+        }
+    }
+}
