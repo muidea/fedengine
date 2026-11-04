@@ -8,5 +8,6 @@ publish.workspace = true
 
 [dependencies]
 fedengine-core.workspace = true
+fedengine-contract.workspace = true
 modorch.workspace = true
 tokio.workspace = true

@@ -3,6 +3,7 @@
 [application]
 name = "fedengine"
 [pgwire]
+# Clients connect to an active catalog_alias or an explicitly configured virtual database.
 listen = "127.0.0.1:15432"
 max_connections = 256
 startup_timeout_ms = 10000
@@ -11,8 +12,9 @@ output_timeout_ms = 10000
 tls_required = false
 max_statements = 128
 max_portals = 64
+allow_cross_database = false
 [duckdb]
-database_path = ":memory:"
+database_path = "./data/fedengine.duckdb"
 max_workers = 8
 threads = 4
 memory_limit = "1GB"
@@ -23,6 +25,18 @@ acquire_timeout_ms = 5000
 install_extensions = false
 pool_max_connections = 16
 pool_wait_timeout_ms = 30000
+# Source definitions below are imported only into a new management database.
+[management]
+# preserve keeps normal disable/resume identities. strict rotates MySQL object
+# identities after restart, disabled intervals and observed metadata failures.
+mysql_identity_policy = "preserve"
+enabled = true
+listen = "127.0.0.1:15433"
+credentials_directory = "./secrets"
+queue_capacity = 64
+max_concurrent_operations = 2
+drain_timeout_ms = 30000
+request_timeout_ms = 10000
 [ddl]
 enabled = true
 allow_drop_schema = false
@@ -33,3 +47,16 @@ grace_period_secs = 30
 name = "fedengine"
 password_secret_ref = "FEDENGINE_PASSWORD"
 # Datasources and capability records are optional; see examples/config/federation.toml.
+
+# Optional explicit account database. TOML definitions are reconciled on restart;
+# API overrides/tombstones take precedence (see docs/management-api.md).
+# remote source definitions above still use the existing first-import lifecycle.
+# [[virtual_databases]]
+# name = "fedengine"
+# owner = "fedengine"
+# connect = []
+# allow_connections = true
+# [[virtual_databases.schemas]]
+# name = "business"
+# source = "registered_source_id"
+# remote_schema = "public"

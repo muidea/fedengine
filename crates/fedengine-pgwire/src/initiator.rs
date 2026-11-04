@@ -137,13 +137,14 @@ impl Initiator for PgwireInitiator {
                 tasks.spawn(move |shutdown|async move{
                     let _session=GaugeGuard::enter(metrics.active_sessions.clone());
                     let _permit=permit;let ready=Arc::new(Notify::new());let authenticated=ready.clone();
-                    let backend=Arc::new(Backend::new(hub, config.clone(), cancellations.clone()));
-                    let auth=Arc::new(Authentication::new(passwords, config.pgwire.tls_required, ready));
+                    let backend=Arc::new(Backend::new(hub.clone(), config.clone(), cancellations.clone()));
+                    let failed=CancellationToken::new();
+                    let auth=Arc::new(Authentication::new(passwords, config.clone(), hub, ready, failed.clone()));
                     let handlers=Arc::new(Handlers{backend,auth,cancellations});
                     let process=pgwire::tokio::process_socket(socket,tls,handlers);tokio::pin!(process);
                     let startup=async{tokio::time::timeout(Duration::from_millis(config.pgwire.startup_timeout_ms),authenticated.notified()).await};
                     tokio::pin!(startup);
-                    tokio::select!{biased;_=stopped.cancelled()=>{},_=shutdown.cancelled()=>{},_=&mut process=>{},result=&mut startup=>{
+                    tokio::select!{biased;_=failed.cancelled()=>{},_=stopped.cancelled()=>{},_=shutdown.cancelled()=>{},_=&mut process=>{},result=&mut startup=>{
                         if result.is_ok(){tokio::select!{_=stopped.cancelled()=>{},_=shutdown.cancelled()=>{},_=&mut process=>{}}}
                     }}
                     Ok(())

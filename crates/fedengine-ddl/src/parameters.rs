@@ -2,6 +2,38 @@ use crate::Analyzer;
 use fedengine_core::*;
 use sqlparser::ast::*;
 use std::ops::ControlFlow;
+
+/// Lower the parameters actually referenced by an execution plan to dense slots.
+/// The returned zero-based indices address the original client parameter vector.
+/// Client parameter discovery and validation must happen before this lowering.
+pub fn compact_parameters(sql: &str) -> Result<(String, Vec<usize>)> {
+    let mut statements = Analyzer::parse(sql)?;
+    if statements.len() != 1 {
+        return Err(EngineError::unsupported("one SQL statement is required"));
+    }
+    // Validate the placeholder grammar and bound even when a caller has no types.
+    parameter_hints(sql)?;
+    let mut slots = std::collections::BTreeSet::new();
+    let _ = visit_expressions(&statements, |e| {
+        if let Expr::Value(v) = e
+            && let Value::Placeholder(p) = &v.value
+        {
+            slots.insert(p[1..].parse::<usize>().expect("validated parameter") - 1);
+        }
+        ControlFlow::<()>::Continue(())
+    });
+    let slots = slots.into_iter().collect::<Vec<_>>();
+    let _ = visit_expressions_mut(&mut statements, |e| {
+        if let Expr::Value(v) = e
+            && let Value::Placeholder(p) = &mut v.value
+        {
+            let original = p[1..].parse::<usize>().expect("validated parameter") - 1;
+            *p = format!("${}", slots.binary_search(&original).unwrap() + 1);
+        }
+        ControlFlow::<()>::Continue(())
+    });
+    Ok((statements.remove(0).to_string(), slots))
+}
 /// Infer only explicit casts. Context-sensitive inference is refused rather than guessing an OID.
 pub fn parameter_hints(sql: &str) -> Result<Vec<Option<String>>> {
     struct Hints {
@@ -35,7 +67,7 @@ pub fn parameter_hints(sql: &str) -> Result<Vec<Option<String>>> {
                     .filter(|n| *n > 0 && *n <= 1024)
             {
                 self.types.resize(self.types.len().max(n), None);
-                self.types[n - 1] = Some(data_type.to_string());
+                self.types[n - 1].get_or_insert_with(|| data_type.to_string());
             }
             ControlFlow::Continue(())
         }

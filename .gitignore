@@ -14,6 +14,9 @@
 
 # Local validation reports, execution logs and intermediate summaries.
 /docs/validation/
+/docs/assets/metadata/
+/tests/fixtures/metadata/*-actual.*
+/tests/fixtures/metadata/performance-environment.json
 *.log
 
 # Python caches and editor temporary files.

@@ -1,0 +1,21 @@
+{
+  "jdbc_version": "42.7.8",
+  "dbeaver_version": "25.2.5",
+  "baseline_server": "PostgreSQL 16.11",
+  "artifacts": {
+    "postgresql-42.7.8.jar": "2a32a9dcbc42d67a50ad3a0de5efd102c8d2be46720045f2cbd6689f160ab7c7",
+    "postgresql-42.7.8-sources.jar": "8087bf75602dc078b65953e11a7667e8a03611262a90edf0d31541c628c12bfa",
+    "PostgreDatabase.java": "8eb81ae35f5d4f2050e2102bce88190c1d1dee4e03da39896040c60fad95366d",
+    "PostgreDataTypeCache.java": "17ad95511a6d821f976183ecd07e5168dd6da8b85670b9da129916dd241bc73e",
+    "PostgreTableBase.java": "5fcc435d79dc038bed1fd62fef256ae4054092a785f065a79d14dd4976404d38",
+    "dbeaver-ce-25.2.5.tar.gz": "9e8df44172228e6e59b46a167d263e98b31caae979715ab4e22a29b67cee62f6"
+  },
+  "jdk_image": "eclipse-temurin@sha256:b78a1d385da875588e21207f07dddf9a1418849971ae857fb24c8f3a7d441a72",
+  "source_matrix": [
+    "PostgreSQL 16.11",
+    "PostgreSQL 17.7",
+    "MySQL 5.7",
+    "MySQL 8.0.44"
+  ],
+  "mysql8_image": "mysql@sha256:9c3380eac945af0736031b200027f581925927c81e010056214a4bd6b6693714"
+}

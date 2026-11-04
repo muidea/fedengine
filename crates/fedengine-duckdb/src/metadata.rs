@@ -1,8 +1,16 @@
-use crate::{codec::type_name, error::engine_error};
+use crate::{
+    codec::type_name,
+    error::{engine_error, metadata_text},
+};
 use duckdb::{Connection, params_from_iter, types::Value};
 use fedengine_contract::{ColumnMeta, RemoteIndex};
 use fedengine_core::*;
-pub(super) fn describe(conn: &Connection, sql: &str, count: usize) -> Result<Vec<ColumnMeta>> {
+pub(super) fn describe(
+    conn: &Connection,
+    sql: &str,
+    count: usize,
+    overrides: Option<&[Option<ColumnMeta>]>,
+) -> Result<Vec<ColumnMeta>> {
     let mut statement = conn
         .prepare(&format!("DESCRIBE {sql}"))
         .map_err(engine_error)?;
@@ -14,10 +22,14 @@ pub(super) fn describe(conn: &Connection, sql: &str, count: usize) -> Result<Vec
     while let Some(row) = rows.next().map_err(engine_error)? {
         let name: String = row.get(0).map_err(engine_error)?;
         let data_type: String = row.get(1).map_err(engine_error)?;
-        result.push(ColumnMeta {
-            name,
-            data_type: type_name(&data_type)?,
-        });
+        let column = if let Some(Some(column)) = overrides.and_then(|o| o.get(result.len())) {
+            column.clone()
+        } else {
+            let mut column = ColumnMeta::new(name.clone(), type_name(&data_type)?);
+            column.type_modifier = crate::codec::type_modifier(&data_type);
+            column
+        };
+        result.push(column);
     }
     Ok(result)
 }
@@ -40,7 +52,7 @@ pub(super) fn discover_indexes(
     let mut rows = stmt.query([]).map_err(engine_error)?;
     let mut indexes = Vec::new();
     while let Some(r) = rows.next().map_err(engine_error)? {
-        let schema: String = r.get(0).map_err(engine_error)?;
+        let schema = metadata_text(r, 0)?;
         if !source.allowed_schemas.contains(&schema) {
             continue;
         }
@@ -48,8 +60,8 @@ pub(super) fn discover_indexes(
             source: source.id.clone(),
             catalog: source.catalog_alias.clone(),
             schema,
-            index: r.get(1).map_err(engine_error)?,
-            table: r.get(2).map_err(engine_error)?,
+            index: metadata_text(r, 1)?,
+            table: metadata_text(r, 2)?,
             protected: r.get(3).map_err(engine_error)?,
         });
         if indexes.len() > 10000 {

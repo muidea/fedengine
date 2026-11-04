@@ -7,7 +7,9 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+fedengine-contract.workspace = true
 fedengine-core.workspace = true
+fedengine-datasource.workspace = true
 fedengine-ddl.workspace = true
 modorch.workspace = true
 

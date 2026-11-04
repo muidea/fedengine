@@ -104,16 +104,200 @@ impl QueryHandler {
         if r.cancel.is_cancelled() {
             return Err(EngineError::new("57014", "query canceled before admission"));
         }
+        let registry = self.registry.acquire().map_err(message_error)?;
+        // Instance lease precedes source fences and is transferred to the actual worker.
+        let instance = tokio::time::timeout(remaining(r)?, registry.instance.clone().read_owned())
+            .await
+            .map_err(|_| EngineError::new("55P03", "instance execution barrier timed out"))?;
+        let definitions = registry.definitions();
+        let headers = ctx
+            .event_hub
+            .request::<_, Result<CatalogReply>>(
+                CATALOG_TOPIC,
+                Destination::Component(ComponentRef::module("catalog-manager")),
+                CatalogRequest::Headers,
+                Default::default(),
+            )
+            .map_err(message_error)?
+            .wait(remaining(r)?)
+            .await
+            .map_err(message_error)?;
+        let headers = match headers.as_ref() {
+            Ok(CatalogReply::Headers(headers)) => headers.clone(),
+            Err(error) => return Err(error.clone()),
+            _ => return Err(EngineError::new("XX000", "invalid catalog headers reply")),
+        };
+        let scope = fedengine_policy::session_metadata_scope(
+            &self.config,
+            &r.principal,
+            &r.session,
+            headers,
+            &definitions,
+        )?;
+        let database_version = scope.virtual_database.as_ref().map(|d| DatabaseVersion {
+            oid: d.oid,
+            revision: d.revision,
+        });
+        if let QueryMode::Execute {
+            expected_database: Some(expected),
+            ..
+        } = &r.mode
+            && Some(*expected) != database_version
+        {
+            return Err(EngineError::new(
+                "0A000",
+                "virtual database definition changed; Parse/Bind the statement again",
+            ));
+        }
+        let declared = match &r.mode {
+            QueryMode::Prepare { parameter_types } => parameter_types
+                .iter()
+                .copied()
+                .enumerate()
+                .filter_map(|(i, t)| t.map(|t| (i + 1, t)))
+                .collect(),
+            QueryMode::Execute {
+                parameter_types, ..
+            } => parameter_types
+                .iter()
+                .copied()
+                .enumerate()
+                .map(|(i, t)| (i + 1, t))
+                .collect(),
+        };
+        let business_sql = match fedengine_pg_compat::plan_with_parameters(
+            &r.sql,
+            &r.session,
+            &scope,
+            r.session_id,
+            &declared,
+        )? {
+            fedengine_pg_compat::CompatibilityPlan::Business(sql) => sql,
+            fedengine_pg_compat::CompatibilityPlan::Metadata(plan) => {
+                let generations = registry.generations(scope.catalogs.iter().map(|c| c.id.clone()));
+                let (prepare_only, parameters, wire_types) =
+                    query_parameters(r, &r.sql, &generations, &plan.parameter_types)?;
+                // Compatibility lowering may erase arguments, but Parse/Bind still
+                // describe and validate the complete original client contract.
+                let wire_types = wire_types
+                    .into_iter()
+                    .map(|t| {
+                        t.ok_or_else(|| {
+                            EngineError::new("42P18", "parameter type cannot be determined")
+                        })
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                let (sql, slots) = fedengine_ddl::compact_parameters(&plan.sql)?;
+                let parameter_types = slots
+                    .iter()
+                    .map(|i| Some(wire_types[*i]))
+                    .collect::<Vec<_>>();
+                let parameters = if prepare_only {
+                    vec![]
+                } else {
+                    slots.iter().map(|i| parameters[*i].clone()).collect()
+                };
+                let sql = typed_sql(&sql, &parameter_types)?;
+                let notices=scope.catalogs.iter().filter(|c|c.stale).take(8).map(|c|(c.snapshot_id.clone(),format!("catalog {} uses a stale metadata snapshot; inspect the management API catalog status",c.catalog))).collect::<Vec<_>>();
+                let runtime = self.runtime.acquire().map_err(message_error)?;
+                let mut reply = runtime
+                    .port
+                    .submit(
+                        ExecuteRequest {
+                            metadata: Some(MetadataExecution {
+                                search_path: fedengine_pg_compat::catalog_path(&r.session, &scope),
+                                scope,
+                                columns: plan.columns,
+                            }),
+                            principal: r.principal.clone(),
+                            session_id: r.session_id,
+                            sql,
+                            kind: StatementKind::Query,
+                            parameters,
+                            parameter_types,
+                            prepare_only,
+                            generations,
+                            deadline: r.deadline,
+                            cancel: r.cancel.clone(),
+                            ddl_source: None,
+                            command: plan.command,
+                        },
+                        Box::new((
+                            self.runtime.acquire().map_err(message_error)?,
+                            registry,
+                            instance,
+                        )),
+                    )
+                    .await?;
+                if let RuntimeReply::Accepted(a) = &mut reply {
+                    a.notices = notices;
+                }
+                if let RuntimeReply::Prepared(d) = &mut reply {
+                    d.parameters = wire_types;
+                }
+                return Ok(query_reply(reply, r, database_version));
+            }
+        };
         let mut analyzer = Analyzer {
-            sources: self.config.datasources.clone(),
+            namespace: None,
+            sources: definitions.clone(),
             indexes: vec![],
         };
+        let mut relations = std::collections::BTreeSet::new();
+        let mut bindings = std::collections::BTreeMap::new();
+        for catalog in scope
+            .catalogs
+            .iter()
+            .filter(|c| c.catalog == r.session.database)
+        {
+            let names = ctx
+                .event_hub
+                .request::<_, Result<CatalogReply>>(
+                    CATALOG_TOPIC,
+                    Destination::Component(ComponentRef::module("catalog-manager")),
+                    CatalogRequest::Names(catalog.snapshot_id.clone()),
+                    Default::default(),
+                )
+                .map_err(message_error)?
+                .wait(remaining(r)?)
+                .await
+                .map_err(message_error)?;
+            match names.as_ref() {
+                Ok(CatalogReply::Names(names)) => relations.extend(names.clone()),
+                Err(e) => return Err(e.clone()),
+                _ => return Err(EngineError::new("XX000", "invalid catalog names reply")),
+            }
+            let schemas = if catalog.mapping.is_none() {
+                definitions
+                    .iter()
+                    .find(|d| d.id == catalog.id)
+                    .map(|d| d.allowed_schemas.as_slice())
+                    .unwrap_or(&[])
+            } else {
+                &catalog.schemas
+            };
+            for schema in schemas {
+                let remote = catalog
+                    .mapping
+                    .as_ref()
+                    .map(|m| m.remote_schema.clone())
+                    .unwrap_or_else(|| schema.clone());
+                bindings.insert(schema.clone(), (catalog.id.clone(), remote));
+            }
+        }
+        analyzer.namespace = Some(fedengine_ddl::BindingNamespace {
+            catalog: r.session.database.clone(),
+            allow_cross_database: self.config.pgwire.allow_cross_database,
+            search_path: fedengine_pg_compat::effective_path(&r.session, &scope),
+            relations,
+            bindings,
+        });
         // Inspect the actual AST to discover DROP INDEX ownership; never trust textual prefixes.
-        let statements = Analyzer::parse(&r.sql)?;
+        let statements = Analyzer::parse(&business_sql)?;
         if statements.len() != 1 {
             return Err(EngineError::unsupported("one SQL statement is required"));
         }
-        if let Some(name) = drop_index_name(&r.sql)? {
+        if let Some(name) = drop_index_name(&business_sql)? {
             let source = analyzer.bind(&name, false)?.source;
             if !self.config.grants.iter().any(|g| {
                 g.principal == r.principal && g.source == source && g.actions.contains("DROP_INDEX")
@@ -138,7 +322,12 @@ impl QueryHandler {
                 _ => return Err(EngineError::new("XX000", "invalid catalog reply")),
             }
         }
-        let analysis = analyzer.analyze(&r.sql)?;
+        let analysis = analyzer.analyze(&business_sql)?;
+        if scope.virtual_database.is_some() && analysis.kind != Kind::Query {
+            return Err(EngineError::unsupported(
+                "virtual database bindings support read-only queries",
+            ));
+        }
         let permission = ctx
             .event_hub
             .request::<_, Result<()>>(
@@ -155,7 +344,7 @@ impl QueryHandler {
             .await
             .map_err(message_error)?;
         permission.as_ref().clone()?;
-        let registry = self.registry.acquire().map_err(message_error)?;
+        let analyzed_versions = registry.generations(analysis.sources.iter().cloned());
         let ddl = analysis.kind == Kind::Ddl;
         let mut reads = Vec::new();
         let mut writes = Vec::new();
@@ -165,7 +354,7 @@ impl QueryHandler {
             if source.stale.load(Ordering::SeqCst) {
                 return Err(EngineError::new(
                     "55000",
-                    "source metadata is stale; an authorized reconciliation/restart is required",
+                    "source metadata is stale; refresh it online",
                 ));
             }
             let duration =
@@ -184,15 +373,7 @@ impl QueryHandler {
                 );
             }
         }
-        // State may change while awaiting the fence. Recheck under the acquired locks.
-        for id in &analysis.sources {
-            if registry.get(id)?.stale.load(Ordering::SeqCst) {
-                return Err(EngineError::new(
-                    "55000",
-                    "source metadata became stale while awaiting its fence",
-                ));
-            }
-        }
+        registry.check(&analyzed_versions)?;
         if let Some(index) = &analysis.index
             && !index.create
         {
@@ -215,54 +396,32 @@ impl QueryHandler {
             }
         }
         let generations = registry.generations(analysis.sources.iter().cloned());
-        let (prepare, parameters, parameter_types): (bool, Vec<Cell>, Vec<Option<PgType>>) =
-            match &r.mode {
-                QueryMode::Prepare { parameter_types } => {
-                    let hints = fedengine_ddl::parameter_hints(&analysis.sql)?;
-                    if parameter_types.len() > hints.len() {
-                        return Err(EngineError::new("08P01", "too many parameter type OIDs"));
-                    }
-                    let resolved: Vec<Option<PgType>> = hints
-                        .into_iter()
-                        .enumerate()
-                        .map(|(i, h)| {
-                            parameter_types
-                                .get(i)
-                                .copied()
-                                .flatten()
-                                .or_else(|| h.and_then(|t| hint_type(&t)))
-                        })
-                        .collect();
-                    (true, vec![], resolved)
-                }
-                QueryMode::Execute {
-                    parameters,
-                    parameter_types,
-                    expected,
-                } => {
-                    if !expected.is_empty() && *expected != generations {
-                        return Err(EngineError::new(
-                            "0A000",
-                            "catalog generation changed; Parse/Bind the statement again",
-                        ));
-                    }
-                    (
-                        false,
-                        parameters.clone(),
-                        parameter_types.iter().map(|t| Some(*t)).collect(),
-                    )
-                }
-            };
+        let (prepare, parameters, wire_types) =
+            query_parameters(r, &r.sql, &generations, &Default::default())?;
+        let wire_types = wire_types
+            .into_iter()
+            .map(|t| {
+                t.ok_or_else(|| EngineError::new("42P18", "parameter type cannot be determined"))
+            })
+            .collect::<Result<Vec<_>>>()?;
         let sql = if let Some(index) = &analysis.index {
-            let source = self
-                .config
-                .datasources
+            let source = definitions
                 .iter()
                 .find(|s| s.id == index.table.source)
                 .unwrap();
             index.duckdb_adapter_sql(source.kind)?
         } else {
             analysis.sql
+        };
+        let (sql, slots) = fedengine_ddl::compact_parameters(&sql)?;
+        let parameter_types = slots
+            .iter()
+            .map(|i| Some(wire_types[*i]))
+            .collect::<Vec<_>>();
+        let parameters = if prepare {
+            vec![]
+        } else {
+            slots.iter().map(|i| parameters[*i].clone()).collect()
         };
         let explicit_hints = fedengine_ddl::parameter_hints(&sql)?;
         let resolved_types: Vec<String> = parameter_types
@@ -302,6 +461,7 @@ impl QueryHandler {
         let ownership = Box::new((
             self.runtime.acquire().map_err(message_error)?,
             registry,
+            instance,
             reads,
             writes,
         ));
@@ -309,6 +469,7 @@ impl QueryHandler {
             .port
             .submit(
                 ExecuteRequest {
+                    metadata: None,
                     principal: r.principal.clone(),
                     session_id: r.session_id,
                     sql,
@@ -331,7 +492,10 @@ impl QueryHandler {
             .await?;
         Ok(match reply {
             RuntimeReply::Prepared(mut descriptor) => {
+                descriptor.parameters = wire_types;
                 descriptor.sql = r.sql.clone();
+                descriptor.namespace_version = r.session.namespace_version;
+                descriptor.database_version = database_version;
                 QueryReply::Prepared(descriptor)
             }
             RuntimeReply::Accepted(a) => QueryReply::Accepted(a),
@@ -367,4 +531,108 @@ fn hint_type(t: &str) -> Option<PgType> {
         v if v.starts_with("DECIMAL") || v.starts_with("NUMERIC") => PgType::Numeric,
         _ => return None,
     })
+}
+
+fn query_reply(
+    reply: RuntimeReply,
+    request: &QueryRequest,
+    database_version: Option<DatabaseVersion>,
+) -> QueryReply {
+    match reply {
+        RuntimeReply::Prepared(mut descriptor) => {
+            descriptor.sql = request.sql.clone();
+            descriptor.namespace_version = request.session.namespace_version;
+            descriptor.database_version = database_version;
+            QueryReply::Prepared(descriptor)
+        }
+        RuntimeReply::Accepted(a) => QueryReply::Accepted(a),
+    }
+}
+fn query_parameters(
+    r: &QueryRequest,
+    sql: &str,
+    generations: &std::collections::BTreeMap<DataSourceId, SourceVersion>,
+    signatures: &std::collections::BTreeMap<usize, PgType>,
+) -> Result<(bool, Vec<Cell>, Vec<Option<PgType>>)> {
+    match &r.mode {
+        QueryMode::Prepare { parameter_types } => {
+            let mut hints = fedengine_ddl::parameter_hints(sql)?;
+            if parameter_types.len() > 1024 {
+                return Err(EngineError::new("54000", "parameter limit exceeded"));
+            }
+            hints.resize(hints.len().max(parameter_types.len()), None);
+            Ok((
+                true,
+                vec![],
+                hints
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, h)| {
+                        parameter_types
+                            .get(i)
+                            .copied()
+                            .flatten()
+                            .or_else(|| signatures.get(&(i + 1)).copied())
+                            .or_else(|| h.and_then(|t| hint_type(&t)))
+                    })
+                    .collect(),
+            ))
+        }
+        QueryMode::Execute {
+            parameters,
+            parameter_types,
+            expected,
+            ..
+        } => {
+            if parameters.len() != parameter_types.len()
+                || parameters.len() < fedengine_ddl::parameter_hints(sql)?.len()
+            {
+                return Err(EngineError::new("08P01", "Bind parameter count mismatch"));
+            }
+            for (value, typ) in parameters.iter().zip(parameter_types) {
+                if let Cell::Array { lower_bound, .. } = value
+                    && *lower_bound != 1
+                    && !matches!(typ, PgType::Catalog(22 | 30))
+                {
+                    return Err(EngineError::unsupported(
+                        "execution of arrays with non-unit lower bounds is not implemented",
+                    ));
+                }
+            }
+            if !expected.is_empty() && expected != generations {
+                return Err(EngineError::new(
+                    "0A000",
+                    "catalog generation changed; Parse/Bind the statement again",
+                ));
+            }
+            Ok((
+                false,
+                parameters.clone(),
+                parameter_types.iter().copied().map(Some).collect(),
+            ))
+        }
+    }
+}
+fn typed_sql(sql: &str, types: &[Option<PgType>]) -> Result<String> {
+    let hints = fedengine_ddl::parameter_hints(sql)?;
+    let types = types
+        .iter()
+        .enumerate()
+        .map(|(i, p)| {
+            if hints.get(i).is_some_and(Option::is_some) {
+                return Ok("SKIP".into());
+            }
+            p.map(|t| t.duckdb_name().into()).ok_or_else(|| {
+                EngineError::new(
+                    "42P18",
+                    "parameter type requires an OID or explicit SQL cast",
+                )
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    if types.is_empty() {
+        Ok(sql.into())
+    } else {
+        fedengine_ddl::cast_parameters(sql, &types)
+    }
 }

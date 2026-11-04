@@ -7,6 +7,15 @@ use duckdb::{
 };
 use fedengine_contract::{Cell, PgType};
 use fedengine_core::*;
+pub(super) fn type_modifier(t: &str) -> i32 {
+    if let Some(args) = t.strip_prefix("DECIMAL(").and_then(|s| s.strip_suffix(')'))
+        && let Some((p, s)) = args.split_once(',')
+        && let (Ok(p), Ok(s)) = (p.trim().parse::<i32>(), s.trim().parse::<i32>())
+    {
+        return ((p << 16) | s) + 4;
+    }
+    -1
+}
 pub(super) fn type_name(t: &str) -> Result<PgType> {
     Ok(match t {
         "BOOLEAN" => PgType::Bool,
@@ -15,7 +24,7 @@ pub(super) fn type_name(t: &str) -> Result<PgType> {
         "BIGINT" | "UINTEGER" => PgType::Int8,
         "FLOAT" => PgType::Float4,
         "DOUBLE" => PgType::Float8,
-        "VARCHAR" | "NULL" => PgType::Text,
+        "VARCHAR" | "NULL" | "\"NULL\"" => PgType::Text,
         "BLOB" => PgType::Bytea,
         "DATE" => PgType::Date,
         "TIME" => PgType::Time,
@@ -33,35 +42,8 @@ pub(super) fn type_name(t: &str) -> Result<PgType> {
         }
     })
 }
-pub(super) fn pg_type(t: &DataType) -> Result<PgType> {
-    Ok(match t {
-        DataType::Boolean => PgType::Bool,
-        DataType::Int8 | DataType::Int16 => PgType::Int2,
-        DataType::UInt8 | DataType::UInt16 | DataType::Int32 => PgType::Int4,
-        DataType::UInt32 | DataType::Int64 => PgType::Int8,
-        DataType::UInt64 | DataType::Decimal128(..) | DataType::Decimal256(..) => PgType::Numeric,
-        DataType::Float32 => PgType::Float4,
-        DataType::Float64 => PgType::Float8,
-        DataType::Utf8 | DataType::LargeUtf8 | DataType::Null => PgType::Text,
-        DataType::Binary | DataType::LargeBinary => PgType::Bytea,
-        DataType::Date32 => PgType::Date,
-        DataType::Time64(_) => PgType::Time,
-        DataType::Timestamp(_, tz) => {
-            if tz.is_some() {
-                PgType::Timestamptz
-            } else {
-                PgType::Timestamp
-            }
-        }
-        _ => {
-            return Err(EngineError::unsupported(
-                "Arrow result type is not supported by PG encoder",
-            ));
-        }
-    })
-}
 pub(super) fn cell(a: &dyn Array, i: usize) -> Result<Cell> {
-    if a.is_null(i) {
+    if matches!(a.data_type(), DataType::Null) || a.is_null(i) {
         return Ok(Cell::Null);
     }
     macro_rules! value {
@@ -146,6 +128,15 @@ pub(super) fn cell(a: &dyn Array, i: usize) -> Result<Cell> {
             }
             .ok_or_else(|| EngineError::new("22008", "timestamp out of range"))?,
         ),
+        DataType::List(_) => {
+            let values = a.as_any().downcast_ref::<ListArray>().unwrap().value(i);
+            Cell::Array {
+                lower_bound: 1,
+                values: (0..values.len())
+                    .map(|i| cell(values.as_ref(), i))
+                    .collect::<Result<_>>()?,
+            }
+        }
         _ => {
             return Err(EngineError::unsupported(
                 "result value encoding is unsupported",
@@ -173,6 +164,9 @@ fn decimal(mut s: String, scale: i8) -> String {
 }
 pub(super) fn to_duckdb(c: &Cell) -> Value {
     match c {
+        Cell::Oid(v) => Value::UInt(*v),
+        Cell::NamedOid { oid, .. } => Value::UInt(*oid),
+        Cell::Array { values, .. } => Value::List(values.iter().map(to_duckdb).collect()),
         Cell::Null => Value::Null,
         Cell::Bool(v) => Value::Boolean(*v),
         Cell::I16(v) => Value::SmallInt(*v),
@@ -198,4 +192,49 @@ fn uuid_text(v: &[u8; 16]) -> String {
         &h[16..20],
         &h[20..]
     )
+}
+
+/// Normalize physical Arrow values to the proven PostgreSQL result type, checking narrowing.
+pub(super) fn coerce(c: Cell, t: PgType) -> Result<Cell> {
+    if matches!(c, Cell::Null) {
+        return Ok(c);
+    }
+    let number = match &c {
+        Cell::I16(v) => Some(i64::from(*v)),
+        Cell::I32(v) => Some(i64::from(*v)),
+        Cell::I64(v) => Some(*v),
+        _ => None,
+    };
+    let range = || {
+        EngineError::new(
+            "22003",
+            "metadata integer is outside its PostgreSQL type range",
+        )
+    };
+    Ok(match (t, number, c) {
+        (PgType::Int2, Some(n), _) => Cell::I16(n.try_into().map_err(|_| range())?),
+        (PgType::Int4, Some(n), _) => Cell::I32(n.try_into().map_err(|_| range())?),
+        (PgType::Int8, Some(n), _) => Cell::I64(n),
+        (PgType::Catalog(24 | 26 | 28 | 29 | 2205 | 2206), Some(n), _) => {
+            Cell::Oid(n.try_into().map_err(|_| range())?)
+        }
+        (PgType::Catalog(oid), _, Cell::Array { values, .. }) => {
+            let element = match oid {
+                22 | 1005 => PgType::Int2,
+                30 | 1028 => PgType::Catalog(26),
+                1007 => PgType::Int4,
+                1016 => PgType::Int8,
+                1000 => PgType::Bool,
+                _ => PgType::Text,
+            };
+            Cell::Array {
+                lower_bound: if matches!(oid, 22 | 30) { 0 } else { 1 },
+                values: values
+                    .into_iter()
+                    .map(|c| coerce(c, element))
+                    .collect::<Result<_>>()?,
+            }
+        }
+        (_, _, c) => c,
+    })
 }

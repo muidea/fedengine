@@ -8,6 +8,7 @@ fn configuration() -> Config {
 }
 fn analyzer() -> Analyzer {
     Analyzer {
+        namespace: None,
         sources: configuration().datasources,
         indexes: vec![],
     }
@@ -159,4 +160,46 @@ fn custom_types_nested_writes_and_fake_builtin_tables_are_rejected() {
         a.analyze("CREATE TABLE pg_crm.public.t(i INTEGER PRIMARY KEY)")
             .is_ok()
     );
+}
+
+#[test]
+fn virtual_schema_bindings_keep_current_database_and_physical_source_distinct() {
+    let mut a = analyzer();
+    a.namespace = Some(BindingNamespace {
+        catalog: "fedengine".into(),
+        allow_cross_database: false,
+        search_path: vec!["missing".into(), "b".into(), "a".into()],
+        relations: [("a".into(), "t".into()), ("b".into(), "t".into())].into(),
+        bindings: [
+            ("a".into(), (DataSourceId("crm".into()), "public".into())),
+            ("b".into(), (DataSourceId("erp".into()), "erp".into())),
+        ]
+        .into(),
+    });
+    let analysis = a
+        .analyze("SELECT a.t.i, fedengine.b.t.* FROM a.t JOIN fedengine.b.t USING(i)")
+        .unwrap();
+    assert_eq!(analysis.sources.len(), 2);
+    assert!(analysis.sql.contains("\"pg_crm\".\"public\".\"t\""));
+    assert!(analysis.sql.contains("\"mysql_erp\".\"erp\".\"t\""));
+    assert_eq!(
+        a.analyze("SELECT * FROM t")
+            .unwrap()
+            .objects
+            .iter()
+            .next()
+            .unwrap()
+            .source
+            .0,
+        "erp"
+    );
+    assert_eq!(
+        a.analyze("SELECT * FROM pg_crm.public.t")
+            .unwrap_err()
+            .sqlstate,
+        "0A000"
+    );
+    assert!(a.analyze("SELECT * FROM \"A\".t").is_err());
+    a.namespace.as_mut().unwrap().allow_cross_database = true;
+    assert!(a.analyze("SELECT * FROM pg_crm.public.t").is_ok());
 }

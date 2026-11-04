@@ -1,16 +1,23 @@
 mod common;
+#[path = "common/wire.rs"]
+mod wire;
 use common::TestDirectory;
-use fedengine_app::FedEngine;
+#[path = "common/protocol_engine.rs"]
+mod protocol_engine;
 use fedengine_core::Config;
+use protocol_engine::ProtocolEngine as FedEngine;
 use std::time::Duration;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
 };
 use tokio_postgres::NoTls;
+use wire::{authenticate, message, packet, raw_start, until_boundary};
 fn config() -> (Config, TestDirectory) {
     let temporary = TestDirectory::new();
     let mut c = Config::load("config/application.toml").unwrap();
+    c.management.enabled = false;
+    c.duckdb.database_path = ":memory:".into();
     c.pgwire.listen = "127.0.0.1:0".into();
     c.users[0].password_secret_ref = "USER".into();
     c.duckdb.max_workers = 2;
@@ -25,6 +32,7 @@ async fn connect(engine: &FedEngine) -> (tokio_postgres::Client, tokio::task::Jo
     c.host("127.0.0.1")
         .port(engine.address().unwrap().port())
         .user("fedengine")
+        .dbname("protocol_db")
         .password(std::env::var("USER").unwrap());
     let (client, connection) = c.connect(NoTls).await.unwrap();
     let task = tokio::spawn(async move {
@@ -137,80 +145,11 @@ async fn rejected_credentials_and_ssl_negotiation() {
     assert!(tokio_postgres::connect(&s, NoTls).await.is_err());
     e.shutdown().await.unwrap();
 }
-async fn packet<S: tokio::io::AsyncWrite + Unpin>(stream: &mut S, tag: u8, body: &[u8]) {
-    stream.write_u8(tag).await.unwrap();
-    stream.write_i32((body.len() + 4) as i32).await.unwrap();
-    stream.write_all(body).await.unwrap();
-}
-async fn message<S: tokio::io::AsyncRead + Unpin>(stream: &mut S) -> (u8, Vec<u8>) {
-    let tag = stream.read_u8().await.unwrap();
-    let n = stream.read_i32().await.unwrap();
-    assert!((4..1_000_000).contains(&n));
-    let mut b = vec![0; n as usize - 4];
-    stream.read_exact(&mut b).await.unwrap();
-    (tag, b)
-}
-async fn raw_start(e: &FedEngine) -> TcpStream {
-    let mut stream = TcpStream::connect(e.address().unwrap()).await.unwrap();
-    authenticate(&mut stream).await;
-    stream
-}
-async fn authenticate<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin>(mut stream: &mut S) {
-    use postgres_protocol::authentication::sasl::{ChannelBinding, ScramSha256};
-    let body = b"\0\x03\0\0user\0fedengine\0database\0fedengine\0\0";
-    stream.write_i32((body.len() + 4) as i32).await.unwrap();
-    stream.write_all(body).await.unwrap();
-    let mut scram = ScramSha256::new(
-        std::env::var("USER").unwrap().as_bytes(),
-        ChannelBinding::unrequested(),
-    );
-    loop {
-        let (tag, b) = message(&mut stream).await;
-        match tag {
-            b'R' => {
-                let code = i32::from_be_bytes(b[..4].try_into().unwrap());
-                match code {
-                    10 => {
-                        let mut p = b"SCRAM-SHA-256\0".to_vec();
-                        p.extend_from_slice(&(scram.message().len() as i32).to_be_bytes());
-                        p.extend_from_slice(scram.message());
-                        packet(&mut stream, b'p', &p).await
-                    }
-                    11 => {
-                        scram.update(&b[4..]).unwrap();
-                        packet(&mut stream, b'p', scram.message()).await
-                    }
-                    12 => scram.finish(&b[4..]).unwrap(),
-                    0 => {}
-                    _ => panic!("unsupported authentication"),
-                }
-            }
-            b'Z' => break,
-            b'E' => panic!("auth error: {:?}", String::from_utf8_lossy(&b)),
-            _ => {}
-        }
-    }
-}
-async fn until_boundary<S: tokio::io::AsyncRead + Unpin>(stream: &mut S) -> (Vec<String>, u8) {
-    let mut rows = vec![];
-    loop {
-        let (tag, b) = message(stream).await;
-        match tag {
-            b'D' => {
-                let n = i32::from_be_bytes(b[2..6].try_into().unwrap());
-                rows.push(String::from_utf8(b[6..6 + n as usize].to_vec()).unwrap());
-            }
-            b's' | b'C' => return (rows, tag),
-            b'E' => panic!("protocol error: {:?}", String::from_utf8_lossy(&b)),
-            _ => {}
-        }
-    }
-}
 #[tokio::test]
 async fn named_portal_resumes_same_execution_without_materializing_all_rows() {
     let (config, _temporary) = config();
     let e = FedEngine::start(config).await.unwrap();
-    let mut s = raw_start(&e).await;
+    let mut s = raw_start(e.address().unwrap(), "protocol_db").await;
     packet(
         &mut s,
         b'P',
@@ -240,6 +179,58 @@ async fn named_portal_resumes_same_execution_without_materializing_all_rows() {
     drop(s);
     e.shutdown().await.unwrap();
     assert_eq!(e.handle.health().pending.operations, 0);
+}
+
+#[tokio::test]
+async fn metadata_portal_resumes_and_catalog_cancel_releases_worker() {
+    let (config, _temporary) = config();
+    let e = FedEngine::start(config).await.unwrap();
+    let mut s = raw_start(e.address().unwrap(), "protocol_db").await;
+    packet(&mut s, b'P', b"stmt\0SELECT typname FROM pg_catalog.pg_type WHERE oid IN (16,20,21,23,25) ORDER BY oid\0\0\0").await;
+    packet(&mut s, b'B', b"portal\0stmt\0\0\0\0\0\0\0").await;
+    let mut execute = b"portal\0".to_vec();
+    execute.extend_from_slice(&2i32.to_be_bytes());
+    for (expected, boundary) in [
+        (vec!["bool", "int8"], b's'),
+        (vec!["int2", "int4"], b's'),
+        (vec!["text"], b'C'),
+    ] {
+        packet(&mut s, b'E', &execute).await;
+        packet(&mut s, b'H', &[]).await;
+        let (rows, tag) = until_boundary(&mut s).await;
+        assert_eq!(rows, expected);
+        assert_eq!(tag, boundary);
+    }
+    packet(&mut s, b'S', &[]).await;
+    assert_eq!(message(&mut s).await.0, b'Z');
+    drop(s);
+    let (client, connection) = connect(&e).await;
+    let cancel = client.cancel_token();
+    let running = tokio::spawn(async move {
+        let error = client.simple_query("SELECT sum(a.oid::BIGINT*b.oid::BIGINT+c.oid::BIGINT+d.oid::BIGINT+f.oid::BIGINT+g.oid::BIGINT) FROM pg_catalog.pg_type a CROSS JOIN pg_catalog.pg_type b CROSS JOIN pg_catalog.pg_type c CROSS JOIN pg_catalog.pg_type d CROSS JOIN pg_catalog.pg_type f CROSS JOIN pg_catalog.pg_type g").await.unwrap_err();
+        assert_eq!(error.code().unwrap().code(), "57014");
+        assert_eq!(
+            client
+                .query_one(
+                    "SELECT oid FROM pg_catalog.pg_type WHERE typname='int4'",
+                    &[]
+                )
+                .await
+                .unwrap()
+                .get::<_, u32>(0),
+            23
+        );
+    });
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    cancel.cancel_query(NoTls).await.unwrap();
+    tokio::time::timeout(Duration::from_secs(5), running)
+        .await
+        .unwrap()
+        .unwrap();
+    connection.await.unwrap();
+    e.shutdown().await.unwrap();
+    assert_eq!(e.metrics().active_workers, 0);
+    assert_eq!(e.handle.task_metrics().tasks, 0);
 }
 
 #[tokio::test]
@@ -307,7 +298,7 @@ async fn tls_handshake_scram_query_and_plaintext_rejection() {
         .connect(ServerName::try_from("localhost").unwrap(), socket)
         .await
         .unwrap();
-    authenticate(&mut stream).await;
+    authenticate(&mut stream, "protocol_db").await;
     packet(&mut stream, b'Q', b"SELECT 42::INTEGER\0").await;
     assert_eq!(until_boundary(&mut stream).await.0, ["42"]);
     drop(stream);
@@ -321,7 +312,7 @@ async fn shutdown_cancels_running_query_and_full_suspended_portal() {
         .try_init();
     let (config, _temporary) = config();
     let e = FedEngine::start(config).await.unwrap();
-    let mut s = raw_start(&e).await;
+    let mut s = raw_start(e.address().unwrap(), "protocol_db").await;
     packet(
         &mut s,
         b'P',
@@ -411,7 +402,7 @@ async fn named_objects_reject_duplicates_and_sync_close_release_quotas() {
     cfg.pgwire.max_statements = 1;
     cfg.pgwire.max_portals = 1;
     let e = FedEngine::start(cfg).await.unwrap();
-    let mut stream = raw_start(&e).await;
+    let mut stream = raw_start(e.address().unwrap(), "protocol_db").await;
     packet(&mut stream, b'P', b"s\0SELECT 1::INTEGER\0\0\0").await;
     packet(&mut stream, b'H', &[]).await;
     assert_eq!(message(&mut stream).await.0, b'1');
@@ -443,4 +434,114 @@ async fn named_objects_reject_duplicates_and_sync_close_release_quotas() {
     assert_eq!(message(&mut stream).await.0, b'1');
     drop(stream);
     e.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn catalog_wire_types_session_execute_and_namespace_invalidation() {
+    let (config, _temporary) = config();
+    let e = FedEngine::start(config).await.unwrap();
+    let (c, t) = connect(&e).await;
+    let row = c
+        .query_one(
+            "SELECT oid, typlen, typname FROM pg_catalog.pg_type WHERE typname='int4'",
+            &[],
+        )
+        .await
+        .unwrap();
+    assert_eq!(row.get::<_, u32>(0), 23);
+    assert_eq!(row.get::<_, i16>(1), 4);
+    assert_eq!(row.get::<_, String>(2), "int4");
+    let setting = c
+        .prepare("SET application_name TO 'metadata regression'")
+        .await
+        .unwrap();
+    // Parse/Describe must not change settings.
+    assert_eq!(
+        c.query_one("SELECT current_setting('application_name')", &[])
+            .await
+            .unwrap()
+            .get::<_, String>(0),
+        ""
+    );
+    c.execute(&setting, &[]).await.unwrap();
+    assert_eq!(
+        c.query_one("SELECT current_setting('application_name')", &[])
+            .await
+            .unwrap()
+            .get::<_, String>(0),
+        "metadata regression"
+    );
+    let old = c
+        .prepare("SELECT oid FROM pg_catalog.pg_type WHERE typname='int4'")
+        .await
+        .unwrap();
+    c.simple_query("SET search_path TO pg_catalog")
+        .await
+        .unwrap();
+    assert_eq!(
+        c.query(&old, &[]).await.unwrap_err().code().unwrap().code(),
+        "0A000"
+    );
+    c.simple_query("RESET ALL").await.unwrap();
+    assert_eq!(
+        c.query_one("SELECT current_setting('application_name')", &[])
+            .await
+            .unwrap()
+            .get::<_, String>(0),
+        ""
+    );
+    for sql in [
+        "SELECT * FROM _fedengine.meta_pg_type",
+        "SELECT * FROM pg_catalog.pg_type, read_csv('/etc/passwd')",
+        "SELECT * INTO stolen FROM pg_catalog.pg_type",
+    ] {
+        assert!(c.simple_query(sql).await.is_err(), "{sql}");
+    }
+    drop(c);
+    t.await.unwrap();
+    e.shutdown().await.unwrap();
+    assert_eq!(e.metrics().active_workers, 0);
+    assert_eq!(e.handle.task_metrics().tasks, 0);
+}
+
+#[tokio::test]
+async fn unknown_startup_database_is_rejected() {
+    let (config, _temporary) = config();
+    let e = FedEngine::start(config).await.unwrap();
+    let mut c = tokio_postgres::Config::new();
+    c.host("127.0.0.1")
+        .port(e.address().unwrap().port())
+        .user("fedengine")
+        .password(std::env::var("USER").unwrap())
+        .dbname("unregistered_catalog");
+    let error = match c.connect(NoTls).await {
+        Ok(_) => panic!("unknown database accepted"),
+        Err(e) => e,
+    };
+    assert_eq!(error.code().unwrap().code(), "3D000");
+    e.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn omitted_and_empty_startup_database_use_login_user_database() {
+    let (mut config, _temporary) = config();
+    config.users[0].name = "protocol_db".into();
+    let engine = FedEngine::start(config).await.unwrap();
+    // Send Startup packets directly: client libraries may fill in a database
+    // themselves, which would leave the server fallback untested.
+    for database in [None, Some(""), Some("protocol_db")] {
+        let mut stream = TcpStream::connect(engine.address().unwrap()).await.unwrap();
+        wire::authenticate_as(&mut stream, "protocol_db", database).await;
+        for sql in [
+            b"SELECT current_database()\0".as_slice(),
+            b"SELECT current_user\0".as_slice(),
+        ] {
+            packet(&mut stream, b'Q', sql).await;
+            let (rows, boundary) = until_boundary(&mut stream).await;
+            assert_eq!(rows, ["protocol_db"]);
+            assert_eq!(boundary, b'C');
+            assert_eq!(message(&mut stream).await.0, b'Z');
+        }
+    }
+    engine.shutdown().await.unwrap();
 }

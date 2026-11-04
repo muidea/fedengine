@@ -6,7 +6,16 @@ use fedengine_core::*;
 use sqlparser::{ast::*, dialect::DuckDbDialect, parser::Parser};
 use std::{collections::BTreeSet, ops::ControlFlow};
 #[derive(Debug, Clone)]
+pub struct BindingNamespace {
+    pub catalog: String,
+    pub allow_cross_database: bool,
+    pub bindings: std::collections::BTreeMap<String, (DataSourceId, String)>,
+    pub search_path: Vec<String>,
+    pub relations: BTreeSet<(String, String)>,
+}
+#[derive(Debug, Clone)]
 pub struct Analyzer {
+    pub namespace: Option<BindingNamespace>,
     pub sources: Vec<DataSourceDefinition>,
     pub indexes: Vec<IndexOwner>,
 }
@@ -23,7 +32,14 @@ impl Analyzer {
         if statements.len() > 64 {
             return Err(EngineError::new("54000", "too many statements"));
         }
-        if statements.len() > 1 && statements.iter().any(|s| !matches!(s, Statement::Query(_))) {
+        if statements.len() > 1
+            && statements.iter().any(|s| {
+                !matches!(
+                    s,
+                    Statement::Query(_) | Statement::Set(_) | Statement::Reset(_)
+                )
+            })
+        {
             return Err(EngineError::unsupported(
                 "multi-statement messages containing writes, DDL or transaction commands are disabled",
             ));

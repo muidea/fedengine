@@ -13,8 +13,10 @@ output_timeout_ms = 10000
 tls_required = false
 max_statements = 128
 max_portals = 64
+# Explicit legacy federation extension; normal PG-compatible deployments leave this false.
+allow_cross_database = true
 [duckdb]
-database_path = ":memory:"
+database_path = "./data/federation.duckdb"
 max_workers = 8
 threads = 4
 memory_limit = "1GB"
@@ -26,6 +28,15 @@ install_extensions = false
 extension_directory = "./data/extensions"
 pool_max_connections = 16
 pool_wait_timeout_ms = 30000
+# Source definitions below are imported only into a new management database.
+[management]
+enabled = true
+listen = "127.0.0.1:15433"
+credentials_directory = "./secrets"
+queue_capacity = 64
+max_concurrent_operations = 2
+drain_timeout_ms = 30000
+request_timeout_ms = 10000
 [ddl]
 enabled = true
 allow_drop_schema = false

@@ -1,0 +1,5227 @@
+{
+  "server": "PostgreSQL 16.11",
+  "image": "postgres:16.11-alpine",
+  "image_digest": "sha256:4327b9fd295502f326f44153a1045a7170ddbfffed1c3829798328556cfd09e2",
+  "fields": [
+    {
+      "relname": "information_schema.check_constraints",
+      "oid": 13326,
+      "attname": "constraint_catalog",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.check_constraints",
+      "oid": 13326,
+      "attname": "constraint_schema",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.check_constraints",
+      "oid": 13326,
+      "attname": "constraint_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.check_constraints",
+      "oid": 13326,
+      "attname": "check_clause",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "table_catalog",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "table_schema",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "table_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "column_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "ordinal_position",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "column_default",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "is_nullable",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "data_type",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "character_maximum_length",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "character_octet_length",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 10,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "numeric_precision",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 11,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "numeric_precision_radix",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 12,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "numeric_scale",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 13,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "datetime_precision",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 14,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "interval_type",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 15,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "interval_precision",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 16,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "character_set_catalog",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 17,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "character_set_schema",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 18,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "character_set_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 19,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "collation_catalog",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 20,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "collation_schema",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 21,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "collation_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 22,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "domain_catalog",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 23,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "domain_schema",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 24,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "domain_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 25,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "udt_catalog",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 26,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "udt_schema",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 27,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "udt_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 28,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "scope_catalog",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 29,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "scope_schema",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 30,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "scope_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 31,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "maximum_cardinality",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 32,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "dtd_identifier",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 33,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "is_self_referencing",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 34,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "is_identity",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 35,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "identity_generation",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 36,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "identity_start",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 37,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "identity_increment",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 38,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "identity_maximum",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 39,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "identity_minimum",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 40,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "identity_cycle",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 41,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "is_generated",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 42,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "generation_expression",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 43,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.columns",
+      "oid": 13361,
+      "attname": "is_updatable",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 44,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.constraint_column_usage",
+      "oid": 13366,
+      "attname": "table_catalog",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.constraint_column_usage",
+      "oid": 13366,
+      "attname": "table_schema",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.constraint_column_usage",
+      "oid": 13366,
+      "attname": "table_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.constraint_column_usage",
+      "oid": 13366,
+      "attname": "column_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.constraint_column_usage",
+      "oid": 13366,
+      "attname": "constraint_catalog",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.constraint_column_usage",
+      "oid": 13366,
+      "attname": "constraint_schema",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.constraint_column_usage",
+      "oid": 13366,
+      "attname": "constraint_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.constraint_table_usage",
+      "oid": 13371,
+      "attname": "table_catalog",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.constraint_table_usage",
+      "oid": 13371,
+      "attname": "table_schema",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.constraint_table_usage",
+      "oid": 13371,
+      "attname": "table_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.constraint_table_usage",
+      "oid": 13371,
+      "attname": "constraint_catalog",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.constraint_table_usage",
+      "oid": 13371,
+      "attname": "constraint_schema",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.constraint_table_usage",
+      "oid": 13371,
+      "attname": "constraint_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.key_column_usage",
+      "oid": 13395,
+      "attname": "constraint_catalog",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.key_column_usage",
+      "oid": 13395,
+      "attname": "constraint_schema",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.key_column_usage",
+      "oid": 13395,
+      "attname": "constraint_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.key_column_usage",
+      "oid": 13395,
+      "attname": "table_catalog",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.key_column_usage",
+      "oid": 13395,
+      "attname": "table_schema",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.key_column_usage",
+      "oid": 13395,
+      "attname": "table_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.key_column_usage",
+      "oid": 13395,
+      "attname": "column_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.key_column_usage",
+      "oid": 13395,
+      "attname": "ordinal_position",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "information_schema.key_column_usage",
+      "oid": 13395,
+      "attname": "position_in_unique_constraint",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "information_schema.referential_constraints",
+      "oid": 13405,
+      "attname": "constraint_catalog",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.referential_constraints",
+      "oid": 13405,
+      "attname": "constraint_schema",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.referential_constraints",
+      "oid": 13405,
+      "attname": "constraint_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.referential_constraints",
+      "oid": 13405,
+      "attname": "unique_constraint_catalog",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.referential_constraints",
+      "oid": 13405,
+      "attname": "unique_constraint_schema",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.referential_constraints",
+      "oid": 13405,
+      "attname": "unique_constraint_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.referential_constraints",
+      "oid": 13405,
+      "attname": "match_option",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.referential_constraints",
+      "oid": 13405,
+      "attname": "update_rule",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.referential_constraints",
+      "oid": 13405,
+      "attname": "delete_rule",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.schemata",
+      "oid": 13448,
+      "attname": "catalog_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.schemata",
+      "oid": 13448,
+      "attname": "schema_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.schemata",
+      "oid": 13448,
+      "attname": "schema_owner",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.schemata",
+      "oid": 13448,
+      "attname": "default_character_set_catalog",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.schemata",
+      "oid": 13448,
+      "attname": "default_character_set_schema",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.schemata",
+      "oid": 13448,
+      "attname": "default_character_set_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.schemata",
+      "oid": 13448,
+      "attname": "sql_path",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.table_constraints",
+      "oid": 13477,
+      "attname": "constraint_catalog",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.table_constraints",
+      "oid": 13477,
+      "attname": "constraint_schema",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.table_constraints",
+      "oid": 13477,
+      "attname": "constraint_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.table_constraints",
+      "oid": 13477,
+      "attname": "table_catalog",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.table_constraints",
+      "oid": 13477,
+      "attname": "table_schema",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.table_constraints",
+      "oid": 13477,
+      "attname": "table_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.table_constraints",
+      "oid": 13477,
+      "attname": "constraint_type",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.table_constraints",
+      "oid": 13477,
+      "attname": "is_deferrable",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.table_constraints",
+      "oid": 13477,
+      "attname": "initially_deferred",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.table_constraints",
+      "oid": 13477,
+      "attname": "enforced",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 10,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.table_constraints",
+      "oid": 13477,
+      "attname": "nulls_distinct",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 11,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.tables",
+      "oid": 13491,
+      "attname": "table_catalog",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.tables",
+      "oid": 13491,
+      "attname": "table_schema",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.tables",
+      "oid": 13491,
+      "attname": "table_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.tables",
+      "oid": 13491,
+      "attname": "table_type",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.tables",
+      "oid": 13491,
+      "attname": "self_referencing_column_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.tables",
+      "oid": 13491,
+      "attname": "reference_generation",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.tables",
+      "oid": 13491,
+      "attname": "user_defined_type_catalog",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.tables",
+      "oid": 13491,
+      "attname": "user_defined_type_schema",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.tables",
+      "oid": 13491,
+      "attname": "user_defined_type_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.tables",
+      "oid": 13491,
+      "attname": "is_insertable_into",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 10,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.tables",
+      "oid": 13491,
+      "attname": "is_typed",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 11,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.tables",
+      "oid": 13491,
+      "attname": "commit_action",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 12,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.views",
+      "oid": 13549,
+      "attname": "table_catalog",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.views",
+      "oid": 13549,
+      "attname": "table_schema",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.views",
+      "oid": 13549,
+      "attname": "table_name",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "name"
+    },
+    {
+      "relname": "information_schema.views",
+      "oid": 13549,
+      "attname": "view_definition",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.views",
+      "oid": 13549,
+      "attname": "check_option",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.views",
+      "oid": 13549,
+      "attname": "is_updatable",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.views",
+      "oid": 13549,
+      "attname": "is_insertable_into",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.views",
+      "oid": 13549,
+      "attname": "is_trigger_updatable",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.views",
+      "oid": 13549,
+      "attname": "is_trigger_deletable",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "information_schema.views",
+      "oid": 13549,
+      "attname": "is_trigger_insertable_into",
+      "atttypid": 1043,
+      "atttypmod": -1,
+      "attnum": 10,
+      "pg_type": "character varying"
+    },
+    {
+      "relname": "pg_am",
+      "oid": 2601,
+      "attname": "oid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_am",
+      "oid": 2601,
+      "attname": "amname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_am",
+      "oid": 2601,
+      "attname": "amhandler",
+      "atttypid": 24,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "regproc"
+    },
+    {
+      "relname": "pg_am",
+      "oid": 2601,
+      "attname": "amtype",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_attrdef",
+      "oid": 2604,
+      "attname": "oid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_attrdef",
+      "oid": 2604,
+      "attname": "adrelid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_attrdef",
+      "oid": 2604,
+      "attname": "adnum",
+      "atttypid": 21,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "smallint"
+    },
+    {
+      "relname": "pg_attrdef",
+      "oid": 2604,
+      "attname": "adbin",
+      "atttypid": 194,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "pg_node_tree"
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "attrelid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "attname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "atttypid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "attlen",
+      "atttypid": 21,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "smallint"
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "attnum",
+      "atttypid": 21,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "smallint"
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "attcacheoff",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "atttypmod",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "attndims",
+      "atttypid": 21,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "smallint"
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "attbyval",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "attalign",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 10,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "attstorage",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 11,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "attcompression",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 12,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "attnotnull",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 13,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "atthasdef",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 14,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "atthasmissing",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 15,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "attidentity",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 16,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "attgenerated",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 17,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "attisdropped",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 18,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "attislocal",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 19,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "attinhcount",
+      "atttypid": 21,
+      "atttypmod": -1,
+      "attnum": 20,
+      "pg_type": "smallint"
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "attstattarget",
+      "atttypid": 21,
+      "atttypmod": -1,
+      "attnum": 21,
+      "pg_type": "smallint"
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "attcollation",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 22,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "attacl",
+      "atttypid": 1034,
+      "atttypmod": -1,
+      "attnum": 23,
+      "pg_type": "aclitem[]"
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "attoptions",
+      "atttypid": 1009,
+      "atttypmod": -1,
+      "attnum": 24,
+      "pg_type": "text[]"
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "attfdwoptions",
+      "atttypid": 1009,
+      "atttypmod": -1,
+      "attnum": 25,
+      "pg_type": "text[]"
+    },
+    {
+      "relname": "pg_attribute",
+      "oid": 1249,
+      "attname": "attmissingval",
+      "atttypid": 2277,
+      "atttypmod": -1,
+      "attnum": 26,
+      "pg_type": "anyarray"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "oid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relnamespace",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "reltype",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "reloftype",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relowner",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relam",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relfilenode",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "reltablespace",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relpages",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 10,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "reltuples",
+      "atttypid": 700,
+      "atttypmod": -1,
+      "attnum": 11,
+      "pg_type": "real"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relallvisible",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 12,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "reltoastrelid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 13,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relhasindex",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 14,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relisshared",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 15,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relpersistence",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 16,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relkind",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 17,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relnatts",
+      "atttypid": 21,
+      "atttypmod": -1,
+      "attnum": 18,
+      "pg_type": "smallint"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relchecks",
+      "atttypid": 21,
+      "atttypmod": -1,
+      "attnum": 19,
+      "pg_type": "smallint"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relhasrules",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 20,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relhastriggers",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 21,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relhassubclass",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 22,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relrowsecurity",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 23,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relforcerowsecurity",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 24,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relispopulated",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 25,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relreplident",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 26,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relispartition",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 27,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relrewrite",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 28,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relfrozenxid",
+      "atttypid": 28,
+      "atttypmod": -1,
+      "attnum": 29,
+      "pg_type": "xid"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relminmxid",
+      "atttypid": 28,
+      "atttypmod": -1,
+      "attnum": 30,
+      "pg_type": "xid"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relacl",
+      "atttypid": 1034,
+      "atttypmod": -1,
+      "attnum": 31,
+      "pg_type": "aclitem[]"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "reloptions",
+      "atttypid": 1009,
+      "atttypmod": -1,
+      "attnum": 32,
+      "pg_type": "text[]"
+    },
+    {
+      "relname": "pg_class",
+      "oid": 1259,
+      "attname": "relpartbound",
+      "atttypid": 194,
+      "atttypmod": -1,
+      "attnum": 33,
+      "pg_type": "pg_node_tree"
+    },
+    {
+      "relname": "pg_collation",
+      "oid": 3456,
+      "attname": "oid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_collation",
+      "oid": 3456,
+      "attname": "collname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_collation",
+      "oid": 3456,
+      "attname": "collnamespace",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_collation",
+      "oid": 3456,
+      "attname": "collowner",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_collation",
+      "oid": 3456,
+      "attname": "collprovider",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_collation",
+      "oid": 3456,
+      "attname": "collisdeterministic",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_collation",
+      "oid": 3456,
+      "attname": "collencoding",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "pg_collation",
+      "oid": 3456,
+      "attname": "collcollate",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_collation",
+      "oid": 3456,
+      "attname": "collctype",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_collation",
+      "oid": 3456,
+      "attname": "colliculocale",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 10,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_collation",
+      "oid": 3456,
+      "attname": "collicurules",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 11,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_collation",
+      "oid": 3456,
+      "attname": "collversion",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 12,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "oid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "conname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "connamespace",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "contype",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "condeferrable",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "condeferred",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "convalidated",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "conrelid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "contypid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "conindid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 10,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "conparentid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 11,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "confrelid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 12,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "confupdtype",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 13,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "confdeltype",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 14,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "confmatchtype",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 15,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "conislocal",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 16,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "coninhcount",
+      "atttypid": 21,
+      "atttypmod": -1,
+      "attnum": 17,
+      "pg_type": "smallint"
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "connoinherit",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 18,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "conkey",
+      "atttypid": 1005,
+      "atttypmod": -1,
+      "attnum": 19,
+      "pg_type": "smallint[]"
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "confkey",
+      "atttypid": 1005,
+      "atttypmod": -1,
+      "attnum": 20,
+      "pg_type": "smallint[]"
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "conpfeqop",
+      "atttypid": 1028,
+      "atttypmod": -1,
+      "attnum": 21,
+      "pg_type": "oid[]"
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "conppeqop",
+      "atttypid": 1028,
+      "atttypmod": -1,
+      "attnum": 22,
+      "pg_type": "oid[]"
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "conffeqop",
+      "atttypid": 1028,
+      "atttypmod": -1,
+      "attnum": 23,
+      "pg_type": "oid[]"
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "confdelsetcols",
+      "atttypid": 1005,
+      "atttypmod": -1,
+      "attnum": 24,
+      "pg_type": "smallint[]"
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "conexclop",
+      "atttypid": 1028,
+      "atttypmod": -1,
+      "attnum": 25,
+      "pg_type": "oid[]"
+    },
+    {
+      "relname": "pg_constraint",
+      "oid": 2606,
+      "attname": "conbin",
+      "atttypid": 194,
+      "atttypmod": -1,
+      "attnum": 26,
+      "pg_type": "pg_node_tree"
+    },
+    {
+      "relname": "pg_conversion",
+      "oid": 2607,
+      "attname": "oid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_conversion",
+      "oid": 2607,
+      "attname": "conname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_conversion",
+      "oid": 2607,
+      "attname": "connamespace",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_conversion",
+      "oid": 2607,
+      "attname": "conowner",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_conversion",
+      "oid": 2607,
+      "attname": "conforencoding",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "pg_conversion",
+      "oid": 2607,
+      "attname": "contoencoding",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "pg_conversion",
+      "oid": 2607,
+      "attname": "conproc",
+      "atttypid": 24,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "regproc"
+    },
+    {
+      "relname": "pg_conversion",
+      "oid": 2607,
+      "attname": "condefault",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_database",
+      "oid": 1262,
+      "attname": "oid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_database",
+      "oid": 1262,
+      "attname": "datname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_database",
+      "oid": 1262,
+      "attname": "datdba",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_database",
+      "oid": 1262,
+      "attname": "encoding",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "pg_database",
+      "oid": 1262,
+      "attname": "datlocprovider",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_database",
+      "oid": 1262,
+      "attname": "datistemplate",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_database",
+      "oid": 1262,
+      "attname": "datallowconn",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_database",
+      "oid": 1262,
+      "attname": "datconnlimit",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "pg_database",
+      "oid": 1262,
+      "attname": "datfrozenxid",
+      "atttypid": 28,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "xid"
+    },
+    {
+      "relname": "pg_database",
+      "oid": 1262,
+      "attname": "datminmxid",
+      "atttypid": 28,
+      "atttypmod": -1,
+      "attnum": 10,
+      "pg_type": "xid"
+    },
+    {
+      "relname": "pg_database",
+      "oid": 1262,
+      "attname": "dattablespace",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 11,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_database",
+      "oid": 1262,
+      "attname": "datcollate",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 12,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_database",
+      "oid": 1262,
+      "attname": "datctype",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 13,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_database",
+      "oid": 1262,
+      "attname": "daticulocale",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 14,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_database",
+      "oid": 1262,
+      "attname": "daticurules",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 15,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_database",
+      "oid": 1262,
+      "attname": "datcollversion",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 16,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_database",
+      "oid": 1262,
+      "attname": "datacl",
+      "atttypid": 1034,
+      "atttypmod": -1,
+      "attnum": 17,
+      "pg_type": "aclitem[]"
+    },
+    {
+      "relname": "pg_depend",
+      "oid": 2608,
+      "attname": "classid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_depend",
+      "oid": 2608,
+      "attname": "objid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_depend",
+      "oid": 2608,
+      "attname": "objsubid",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "pg_depend",
+      "oid": 2608,
+      "attname": "refclassid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_depend",
+      "oid": 2608,
+      "attname": "refobjid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_depend",
+      "oid": 2608,
+      "attname": "refobjsubid",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "pg_depend",
+      "oid": 2608,
+      "attname": "deptype",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_description",
+      "oid": 2609,
+      "attname": "objoid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_description",
+      "oid": 2609,
+      "attname": "classoid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_description",
+      "oid": 2609,
+      "attname": "objsubid",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "pg_description",
+      "oid": 2609,
+      "attname": "description",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_enum",
+      "oid": 3501,
+      "attname": "oid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_enum",
+      "oid": 3501,
+      "attname": "enumtypid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_enum",
+      "oid": 3501,
+      "attname": "enumsortorder",
+      "atttypid": 700,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "real"
+    },
+    {
+      "relname": "pg_enum",
+      "oid": 3501,
+      "attname": "enumlabel",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_extension",
+      "oid": 3079,
+      "attname": "oid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_extension",
+      "oid": 3079,
+      "attname": "extname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_extension",
+      "oid": 3079,
+      "attname": "extowner",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_extension",
+      "oid": 3079,
+      "attname": "extnamespace",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_extension",
+      "oid": 3079,
+      "attname": "extrelocatable",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_extension",
+      "oid": 3079,
+      "attname": "extversion",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_extension",
+      "oid": 3079,
+      "attname": "extconfig",
+      "atttypid": 1028,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "oid[]"
+    },
+    {
+      "relname": "pg_extension",
+      "oid": 3079,
+      "attname": "extcondition",
+      "atttypid": 1009,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "text[]"
+    },
+    {
+      "relname": "pg_foreign_data_wrapper",
+      "oid": 2328,
+      "attname": "oid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_foreign_data_wrapper",
+      "oid": 2328,
+      "attname": "fdwname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_foreign_data_wrapper",
+      "oid": 2328,
+      "attname": "fdwowner",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_foreign_data_wrapper",
+      "oid": 2328,
+      "attname": "fdwhandler",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_foreign_data_wrapper",
+      "oid": 2328,
+      "attname": "fdwvalidator",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_foreign_data_wrapper",
+      "oid": 2328,
+      "attname": "fdwacl",
+      "atttypid": 1034,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "aclitem[]"
+    },
+    {
+      "relname": "pg_foreign_data_wrapper",
+      "oid": 2328,
+      "attname": "fdwoptions",
+      "atttypid": 1009,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "text[]"
+    },
+    {
+      "relname": "pg_foreign_server",
+      "oid": 1417,
+      "attname": "oid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_foreign_server",
+      "oid": 1417,
+      "attname": "srvname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_foreign_server",
+      "oid": 1417,
+      "attname": "srvowner",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_foreign_server",
+      "oid": 1417,
+      "attname": "srvfdw",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_foreign_server",
+      "oid": 1417,
+      "attname": "srvtype",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_foreign_server",
+      "oid": 1417,
+      "attname": "srvversion",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_foreign_server",
+      "oid": 1417,
+      "attname": "srvacl",
+      "atttypid": 1034,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "aclitem[]"
+    },
+    {
+      "relname": "pg_foreign_server",
+      "oid": 1417,
+      "attname": "srvoptions",
+      "atttypid": 1009,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "text[]"
+    },
+    {
+      "relname": "pg_foreign_table",
+      "oid": 3118,
+      "attname": "ftrelid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_foreign_table",
+      "oid": 3118,
+      "attname": "ftserver",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_foreign_table",
+      "oid": 3118,
+      "attname": "ftoptions",
+      "atttypid": 1009,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "text[]"
+    },
+    {
+      "relname": "pg_index",
+      "oid": 2610,
+      "attname": "indexrelid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_index",
+      "oid": 2610,
+      "attname": "indrelid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_index",
+      "oid": 2610,
+      "attname": "indnatts",
+      "atttypid": 21,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "smallint"
+    },
+    {
+      "relname": "pg_index",
+      "oid": 2610,
+      "attname": "indnkeyatts",
+      "atttypid": 21,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "smallint"
+    },
+    {
+      "relname": "pg_index",
+      "oid": 2610,
+      "attname": "indisunique",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_index",
+      "oid": 2610,
+      "attname": "indnullsnotdistinct",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_index",
+      "oid": 2610,
+      "attname": "indisprimary",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_index",
+      "oid": 2610,
+      "attname": "indisexclusion",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_index",
+      "oid": 2610,
+      "attname": "indimmediate",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_index",
+      "oid": 2610,
+      "attname": "indisclustered",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 10,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_index",
+      "oid": 2610,
+      "attname": "indisvalid",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 11,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_index",
+      "oid": 2610,
+      "attname": "indcheckxmin",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 12,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_index",
+      "oid": 2610,
+      "attname": "indisready",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 13,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_index",
+      "oid": 2610,
+      "attname": "indislive",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 14,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_index",
+      "oid": 2610,
+      "attname": "indisreplident",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 15,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_index",
+      "oid": 2610,
+      "attname": "indkey",
+      "atttypid": 22,
+      "atttypmod": -1,
+      "attnum": 16,
+      "pg_type": "int2vector"
+    },
+    {
+      "relname": "pg_index",
+      "oid": 2610,
+      "attname": "indcollation",
+      "atttypid": 30,
+      "atttypmod": -1,
+      "attnum": 17,
+      "pg_type": "oidvector"
+    },
+    {
+      "relname": "pg_index",
+      "oid": 2610,
+      "attname": "indclass",
+      "atttypid": 30,
+      "atttypmod": -1,
+      "attnum": 18,
+      "pg_type": "oidvector"
+    },
+    {
+      "relname": "pg_index",
+      "oid": 2610,
+      "attname": "indoption",
+      "atttypid": 22,
+      "atttypmod": -1,
+      "attnum": 19,
+      "pg_type": "int2vector"
+    },
+    {
+      "relname": "pg_index",
+      "oid": 2610,
+      "attname": "indexprs",
+      "atttypid": 194,
+      "atttypmod": -1,
+      "attnum": 20,
+      "pg_type": "pg_node_tree"
+    },
+    {
+      "relname": "pg_index",
+      "oid": 2610,
+      "attname": "indpred",
+      "atttypid": 194,
+      "atttypmod": -1,
+      "attnum": 21,
+      "pg_type": "pg_node_tree"
+    },
+    {
+      "relname": "pg_indexes",
+      "oid": 12043,
+      "attname": "schemaname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_indexes",
+      "oid": 12043,
+      "attname": "tablename",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_indexes",
+      "oid": 12043,
+      "attname": "indexname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_indexes",
+      "oid": 12043,
+      "attname": "tablespace",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_indexes",
+      "oid": 12043,
+      "attname": "indexdef",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_inherits",
+      "oid": 2611,
+      "attname": "inhrelid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_inherits",
+      "oid": 2611,
+      "attname": "inhparent",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_inherits",
+      "oid": 2611,
+      "attname": "inhseqno",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "pg_inherits",
+      "oid": 2611,
+      "attname": "inhdetachpending",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_language",
+      "oid": 2612,
+      "attname": "oid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_language",
+      "oid": 2612,
+      "attname": "lanname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_language",
+      "oid": 2612,
+      "attname": "lanowner",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_language",
+      "oid": 2612,
+      "attname": "lanispl",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_language",
+      "oid": 2612,
+      "attname": "lanpltrusted",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_language",
+      "oid": 2612,
+      "attname": "lanplcallfoid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_language",
+      "oid": 2612,
+      "attname": "laninline",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_language",
+      "oid": 2612,
+      "attname": "lanvalidator",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_language",
+      "oid": 2612,
+      "attname": "lanacl",
+      "atttypid": 1034,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "aclitem[]"
+    },
+    {
+      "relname": "pg_matviews",
+      "oid": 12038,
+      "attname": "schemaname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_matviews",
+      "oid": 12038,
+      "attname": "matviewname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_matviews",
+      "oid": 12038,
+      "attname": "matviewowner",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_matviews",
+      "oid": 12038,
+      "attname": "tablespace",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_matviews",
+      "oid": 12038,
+      "attname": "hasindexes",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_matviews",
+      "oid": 12038,
+      "attname": "ispopulated",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_matviews",
+      "oid": 12038,
+      "attname": "definition",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_namespace",
+      "oid": 2615,
+      "attname": "oid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_namespace",
+      "oid": 2615,
+      "attname": "nspname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_namespace",
+      "oid": 2615,
+      "attname": "nspowner",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_namespace",
+      "oid": 2615,
+      "attname": "nspacl",
+      "atttypid": 1034,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "aclitem[]"
+    },
+    {
+      "relname": "pg_opclass",
+      "oid": 2616,
+      "attname": "oid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_opclass",
+      "oid": 2616,
+      "attname": "opcmethod",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_opclass",
+      "oid": 2616,
+      "attname": "opcname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_opclass",
+      "oid": 2616,
+      "attname": "opcnamespace",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_opclass",
+      "oid": 2616,
+      "attname": "opcowner",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_opclass",
+      "oid": 2616,
+      "attname": "opcfamily",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_opclass",
+      "oid": 2616,
+      "attname": "opcintype",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_opclass",
+      "oid": 2616,
+      "attname": "opcdefault",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_opclass",
+      "oid": 2616,
+      "attname": "opckeytype",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_partitioned_table",
+      "oid": 3350,
+      "attname": "partrelid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_partitioned_table",
+      "oid": 3350,
+      "attname": "partstrat",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_partitioned_table",
+      "oid": 3350,
+      "attname": "partnatts",
+      "atttypid": 21,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "smallint"
+    },
+    {
+      "relname": "pg_partitioned_table",
+      "oid": 3350,
+      "attname": "partdefid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_partitioned_table",
+      "oid": 3350,
+      "attname": "partattrs",
+      "atttypid": 22,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "int2vector"
+    },
+    {
+      "relname": "pg_partitioned_table",
+      "oid": 3350,
+      "attname": "partclass",
+      "atttypid": 30,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "oidvector"
+    },
+    {
+      "relname": "pg_partitioned_table",
+      "oid": 3350,
+      "attname": "partcollation",
+      "atttypid": 30,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "oidvector"
+    },
+    {
+      "relname": "pg_partitioned_table",
+      "oid": 3350,
+      "attname": "partexprs",
+      "atttypid": 194,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "pg_node_tree"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "oid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "proname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "pronamespace",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "proowner",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "prolang",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "procost",
+      "atttypid": 700,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "real"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "prorows",
+      "atttypid": 700,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "real"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "provariadic",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "prosupport",
+      "atttypid": 24,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "regproc"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "prokind",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 10,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "prosecdef",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 11,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "proleakproof",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 12,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "proisstrict",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 13,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "proretset",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 14,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "provolatile",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 15,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "proparallel",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 16,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "pronargs",
+      "atttypid": 21,
+      "atttypmod": -1,
+      "attnum": 17,
+      "pg_type": "smallint"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "pronargdefaults",
+      "atttypid": 21,
+      "atttypmod": -1,
+      "attnum": 18,
+      "pg_type": "smallint"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "prorettype",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 19,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "proargtypes",
+      "atttypid": 30,
+      "atttypmod": -1,
+      "attnum": 20,
+      "pg_type": "oidvector"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "proallargtypes",
+      "atttypid": 1028,
+      "atttypmod": -1,
+      "attnum": 21,
+      "pg_type": "oid[]"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "proargmodes",
+      "atttypid": 1002,
+      "atttypmod": -1,
+      "attnum": 22,
+      "pg_type": "\"char\"[]"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "proargnames",
+      "atttypid": 1009,
+      "atttypmod": -1,
+      "attnum": 23,
+      "pg_type": "text[]"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "proargdefaults",
+      "atttypid": 194,
+      "atttypmod": -1,
+      "attnum": 24,
+      "pg_type": "pg_node_tree"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "protrftypes",
+      "atttypid": 1028,
+      "atttypmod": -1,
+      "attnum": 25,
+      "pg_type": "oid[]"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "prosrc",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 26,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "probin",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 27,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "prosqlbody",
+      "atttypid": 194,
+      "atttypmod": -1,
+      "attnum": 28,
+      "pg_type": "pg_node_tree"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "proconfig",
+      "atttypid": 1009,
+      "atttypmod": -1,
+      "attnum": 29,
+      "pg_type": "text[]"
+    },
+    {
+      "relname": "pg_proc",
+      "oid": 1255,
+      "attname": "proacl",
+      "atttypid": 1034,
+      "atttypmod": -1,
+      "attnum": 30,
+      "pg_type": "aclitem[]"
+    },
+    {
+      "relname": "pg_rewrite",
+      "oid": 2618,
+      "attname": "oid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_rewrite",
+      "oid": 2618,
+      "attname": "rulename",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_rewrite",
+      "oid": 2618,
+      "attname": "ev_class",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_rewrite",
+      "oid": 2618,
+      "attname": "ev_type",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_rewrite",
+      "oid": 2618,
+      "attname": "ev_enabled",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_rewrite",
+      "oid": 2618,
+      "attname": "is_instead",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_rewrite",
+      "oid": 2618,
+      "attname": "ev_qual",
+      "atttypid": 194,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "pg_node_tree"
+    },
+    {
+      "relname": "pg_rewrite",
+      "oid": 2618,
+      "attname": "ev_action",
+      "atttypid": 194,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "pg_node_tree"
+    },
+    {
+      "relname": "pg_roles",
+      "oid": 12000,
+      "attname": "rolname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_roles",
+      "oid": 12000,
+      "attname": "rolsuper",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_roles",
+      "oid": 12000,
+      "attname": "rolinherit",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_roles",
+      "oid": 12000,
+      "attname": "rolcreaterole",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_roles",
+      "oid": 12000,
+      "attname": "rolcreatedb",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_roles",
+      "oid": 12000,
+      "attname": "rolcanlogin",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_roles",
+      "oid": 12000,
+      "attname": "rolreplication",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_roles",
+      "oid": 12000,
+      "attname": "rolconnlimit",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "pg_roles",
+      "oid": 12000,
+      "attname": "rolpassword",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_roles",
+      "oid": 12000,
+      "attname": "rolvaliduntil",
+      "atttypid": 1184,
+      "atttypmod": -1,
+      "attnum": 10,
+      "pg_type": "timestamp with time zone"
+    },
+    {
+      "relname": "pg_roles",
+      "oid": 12000,
+      "attname": "rolbypassrls",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 11,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_roles",
+      "oid": 12000,
+      "attname": "rolconfig",
+      "atttypid": 1009,
+      "atttypmod": -1,
+      "attnum": 12,
+      "pg_type": "text[]"
+    },
+    {
+      "relname": "pg_roles",
+      "oid": 12000,
+      "attname": "oid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 13,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_settings",
+      "oid": 12104,
+      "attname": "name",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_settings",
+      "oid": 12104,
+      "attname": "setting",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_settings",
+      "oid": 12104,
+      "attname": "unit",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_settings",
+      "oid": 12104,
+      "attname": "category",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_settings",
+      "oid": 12104,
+      "attname": "short_desc",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_settings",
+      "oid": 12104,
+      "attname": "extra_desc",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_settings",
+      "oid": 12104,
+      "attname": "context",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_settings",
+      "oid": 12104,
+      "attname": "vartype",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_settings",
+      "oid": 12104,
+      "attname": "source",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_settings",
+      "oid": 12104,
+      "attname": "min_val",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 10,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_settings",
+      "oid": 12104,
+      "attname": "max_val",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 11,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_settings",
+      "oid": 12104,
+      "attname": "enumvals",
+      "atttypid": 1009,
+      "atttypmod": -1,
+      "attnum": 12,
+      "pg_type": "text[]"
+    },
+    {
+      "relname": "pg_settings",
+      "oid": 12104,
+      "attname": "boot_val",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 13,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_settings",
+      "oid": 12104,
+      "attname": "reset_val",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 14,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_settings",
+      "oid": 12104,
+      "attname": "sourcefile",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 15,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_settings",
+      "oid": 12104,
+      "attname": "sourceline",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 16,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "pg_settings",
+      "oid": 12104,
+      "attname": "pending_restart",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 17,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_shdescription",
+      "oid": 2396,
+      "attname": "objoid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_shdescription",
+      "oid": 2396,
+      "attname": "classoid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_shdescription",
+      "oid": 2396,
+      "attname": "description",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_stat_all_indexes",
+      "oid": 12183,
+      "attname": "relid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_stat_all_indexes",
+      "oid": 12183,
+      "attname": "indexrelid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_stat_all_indexes",
+      "oid": 12183,
+      "attname": "schemaname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_stat_all_indexes",
+      "oid": 12183,
+      "attname": "relname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_stat_all_indexes",
+      "oid": 12183,
+      "attname": "indexrelname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_stat_all_indexes",
+      "oid": 12183,
+      "attname": "idx_scan",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_all_indexes",
+      "oid": 12183,
+      "attname": "last_idx_scan",
+      "atttypid": 1184,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "timestamp with time zone"
+    },
+    {
+      "relname": "pg_stat_all_indexes",
+      "oid": 12183,
+      "attname": "idx_tup_read",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_all_indexes",
+      "oid": 12183,
+      "attname": "idx_tup_fetch",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "relid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "schemaname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "relname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "seq_scan",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "last_seq_scan",
+      "atttypid": 1184,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "timestamp with time zone"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "seq_tup_read",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "idx_scan",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "last_idx_scan",
+      "atttypid": 1184,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "timestamp with time zone"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "idx_tup_fetch",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "n_tup_ins",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 10,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "n_tup_upd",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 11,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "n_tup_del",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 12,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "n_tup_hot_upd",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 13,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "n_tup_newpage_upd",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 14,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "n_live_tup",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 15,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "n_dead_tup",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 16,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "n_mod_since_analyze",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 17,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "n_ins_since_vacuum",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 18,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "last_vacuum",
+      "atttypid": 1184,
+      "atttypmod": -1,
+      "attnum": 19,
+      "pg_type": "timestamp with time zone"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "last_autovacuum",
+      "atttypid": 1184,
+      "atttypmod": -1,
+      "attnum": 20,
+      "pg_type": "timestamp with time zone"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "last_analyze",
+      "atttypid": 1184,
+      "atttypmod": -1,
+      "attnum": 21,
+      "pg_type": "timestamp with time zone"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "last_autoanalyze",
+      "atttypid": 1184,
+      "atttypmod": -1,
+      "attnum": 22,
+      "pg_type": "timestamp with time zone"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "vacuum_count",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 23,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "autovacuum_count",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 24,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "analyze_count",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 25,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_all_tables",
+      "oid": 12142,
+      "attname": "autoanalyze_count",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 26,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_user_indexes",
+      "oid": 12192,
+      "attname": "relid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_stat_user_indexes",
+      "oid": 12192,
+      "attname": "indexrelid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_stat_user_indexes",
+      "oid": 12192,
+      "attname": "schemaname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_stat_user_indexes",
+      "oid": 12192,
+      "attname": "relname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_stat_user_indexes",
+      "oid": 12192,
+      "attname": "indexrelname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_stat_user_indexes",
+      "oid": 12192,
+      "attname": "idx_scan",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_user_indexes",
+      "oid": 12192,
+      "attname": "last_idx_scan",
+      "atttypid": 1184,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "timestamp with time zone"
+    },
+    {
+      "relname": "pg_stat_user_indexes",
+      "oid": 12192,
+      "attname": "idx_tup_read",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_user_indexes",
+      "oid": 12192,
+      "attname": "idx_tup_fetch",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "relid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "schemaname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "relname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "seq_scan",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "last_seq_scan",
+      "atttypid": 1184,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "timestamp with time zone"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "seq_tup_read",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "idx_scan",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "last_idx_scan",
+      "atttypid": 1184,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "timestamp with time zone"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "idx_tup_fetch",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "n_tup_ins",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 10,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "n_tup_upd",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 11,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "n_tup_del",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 12,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "n_tup_hot_upd",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 13,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "n_tup_newpage_upd",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 14,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "n_live_tup",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 15,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "n_dead_tup",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 16,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "n_mod_since_analyze",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 17,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "n_ins_since_vacuum",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 18,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "last_vacuum",
+      "atttypid": 1184,
+      "atttypmod": -1,
+      "attnum": 19,
+      "pg_type": "timestamp with time zone"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "last_autovacuum",
+      "atttypid": 1184,
+      "atttypmod": -1,
+      "attnum": 20,
+      "pg_type": "timestamp with time zone"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "last_analyze",
+      "atttypid": 1184,
+      "atttypmod": -1,
+      "attnum": 21,
+      "pg_type": "timestamp with time zone"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "last_autoanalyze",
+      "atttypid": 1184,
+      "atttypmod": -1,
+      "attnum": 22,
+      "pg_type": "timestamp with time zone"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "vacuum_count",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 23,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "autovacuum_count",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 24,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "analyze_count",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 25,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stat_user_tables",
+      "oid": 12161,
+      "attname": "autoanalyze_count",
+      "atttypid": 20,
+      "atttypmod": -1,
+      "attnum": 26,
+      "pg_type": "bigint"
+    },
+    {
+      "relname": "pg_stats",
+      "oid": 12053,
+      "attname": "schemaname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_stats",
+      "oid": 12053,
+      "attname": "tablename",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_stats",
+      "oid": 12053,
+      "attname": "attname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_stats",
+      "oid": 12053,
+      "attname": "inherited",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_stats",
+      "oid": 12053,
+      "attname": "null_frac",
+      "atttypid": 700,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "real"
+    },
+    {
+      "relname": "pg_stats",
+      "oid": 12053,
+      "attname": "avg_width",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "pg_stats",
+      "oid": 12053,
+      "attname": "n_distinct",
+      "atttypid": 700,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "real"
+    },
+    {
+      "relname": "pg_stats",
+      "oid": 12053,
+      "attname": "most_common_vals",
+      "atttypid": 2277,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "anyarray"
+    },
+    {
+      "relname": "pg_stats",
+      "oid": 12053,
+      "attname": "most_common_freqs",
+      "atttypid": 1021,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "real[]"
+    },
+    {
+      "relname": "pg_stats",
+      "oid": 12053,
+      "attname": "histogram_bounds",
+      "atttypid": 2277,
+      "atttypmod": -1,
+      "attnum": 10,
+      "pg_type": "anyarray"
+    },
+    {
+      "relname": "pg_stats",
+      "oid": 12053,
+      "attname": "correlation",
+      "atttypid": 700,
+      "atttypmod": -1,
+      "attnum": 11,
+      "pg_type": "real"
+    },
+    {
+      "relname": "pg_stats",
+      "oid": 12053,
+      "attname": "most_common_elems",
+      "atttypid": 2277,
+      "atttypmod": -1,
+      "attnum": 12,
+      "pg_type": "anyarray"
+    },
+    {
+      "relname": "pg_stats",
+      "oid": 12053,
+      "attname": "most_common_elem_freqs",
+      "atttypid": 1021,
+      "atttypmod": -1,
+      "attnum": 13,
+      "pg_type": "real[]"
+    },
+    {
+      "relname": "pg_stats",
+      "oid": 12053,
+      "attname": "elem_count_histogram",
+      "atttypid": 1021,
+      "atttypmod": -1,
+      "attnum": 14,
+      "pg_type": "real[]"
+    },
+    {
+      "relname": "pg_tables",
+      "oid": 12033,
+      "attname": "schemaname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_tables",
+      "oid": 12033,
+      "attname": "tablename",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_tables",
+      "oid": 12033,
+      "attname": "tableowner",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_tables",
+      "oid": 12033,
+      "attname": "tablespace",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_tables",
+      "oid": 12033,
+      "attname": "hasindexes",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_tables",
+      "oid": 12033,
+      "attname": "hasrules",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_tables",
+      "oid": 12033,
+      "attname": "hastriggers",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_tables",
+      "oid": 12033,
+      "attname": "rowsecurity",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_tablespace",
+      "oid": 1213,
+      "attname": "oid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_tablespace",
+      "oid": 1213,
+      "attname": "spcname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_tablespace",
+      "oid": 1213,
+      "attname": "spcowner",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_tablespace",
+      "oid": 1213,
+      "attname": "spcacl",
+      "atttypid": 1034,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "aclitem[]"
+    },
+    {
+      "relname": "pg_tablespace",
+      "oid": 1213,
+      "attname": "spcoptions",
+      "atttypid": 1009,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "text[]"
+    },
+    {
+      "relname": "pg_trigger",
+      "oid": 2620,
+      "attname": "oid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_trigger",
+      "oid": 2620,
+      "attname": "tgrelid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_trigger",
+      "oid": 2620,
+      "attname": "tgparentid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_trigger",
+      "oid": 2620,
+      "attname": "tgname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_trigger",
+      "oid": 2620,
+      "attname": "tgfoid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_trigger",
+      "oid": 2620,
+      "attname": "tgtype",
+      "atttypid": 21,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "smallint"
+    },
+    {
+      "relname": "pg_trigger",
+      "oid": 2620,
+      "attname": "tgenabled",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_trigger",
+      "oid": 2620,
+      "attname": "tgisinternal",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_trigger",
+      "oid": 2620,
+      "attname": "tgconstrrelid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_trigger",
+      "oid": 2620,
+      "attname": "tgconstrindid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 10,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_trigger",
+      "oid": 2620,
+      "attname": "tgconstraint",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 11,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_trigger",
+      "oid": 2620,
+      "attname": "tgdeferrable",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 12,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_trigger",
+      "oid": 2620,
+      "attname": "tginitdeferred",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 13,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_trigger",
+      "oid": 2620,
+      "attname": "tgnargs",
+      "atttypid": 21,
+      "atttypmod": -1,
+      "attnum": 14,
+      "pg_type": "smallint"
+    },
+    {
+      "relname": "pg_trigger",
+      "oid": 2620,
+      "attname": "tgattr",
+      "atttypid": 22,
+      "atttypmod": -1,
+      "attnum": 15,
+      "pg_type": "int2vector"
+    },
+    {
+      "relname": "pg_trigger",
+      "oid": 2620,
+      "attname": "tgargs",
+      "atttypid": 17,
+      "atttypmod": -1,
+      "attnum": 16,
+      "pg_type": "bytea"
+    },
+    {
+      "relname": "pg_trigger",
+      "oid": 2620,
+      "attname": "tgqual",
+      "atttypid": 194,
+      "atttypmod": -1,
+      "attnum": 17,
+      "pg_type": "pg_node_tree"
+    },
+    {
+      "relname": "pg_trigger",
+      "oid": 2620,
+      "attname": "tgoldtable",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 18,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_trigger",
+      "oid": 2620,
+      "attname": "tgnewtable",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 19,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "oid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typnamespace",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typowner",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typlen",
+      "atttypid": 21,
+      "atttypmod": -1,
+      "attnum": 5,
+      "pg_type": "smallint"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typbyval",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 6,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typtype",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 7,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typcategory",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 8,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typispreferred",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 9,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typisdefined",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 10,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typdelim",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 11,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typrelid",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 12,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typsubscript",
+      "atttypid": 24,
+      "atttypmod": -1,
+      "attnum": 13,
+      "pg_type": "regproc"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typelem",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 14,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typarray",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 15,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typinput",
+      "atttypid": 24,
+      "atttypmod": -1,
+      "attnum": 16,
+      "pg_type": "regproc"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typoutput",
+      "atttypid": 24,
+      "atttypmod": -1,
+      "attnum": 17,
+      "pg_type": "regproc"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typreceive",
+      "atttypid": 24,
+      "atttypmod": -1,
+      "attnum": 18,
+      "pg_type": "regproc"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typsend",
+      "atttypid": 24,
+      "atttypmod": -1,
+      "attnum": 19,
+      "pg_type": "regproc"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typmodin",
+      "atttypid": 24,
+      "atttypmod": -1,
+      "attnum": 20,
+      "pg_type": "regproc"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typmodout",
+      "atttypid": 24,
+      "atttypmod": -1,
+      "attnum": 21,
+      "pg_type": "regproc"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typanalyze",
+      "atttypid": 24,
+      "atttypmod": -1,
+      "attnum": 22,
+      "pg_type": "regproc"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typalign",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 23,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typstorage",
+      "atttypid": 18,
+      "atttypmod": -1,
+      "attnum": 24,
+      "pg_type": "\"char\""
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typnotnull",
+      "atttypid": 16,
+      "atttypmod": -1,
+      "attnum": 25,
+      "pg_type": "boolean"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typbasetype",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 26,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typtypmod",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 27,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typndims",
+      "atttypid": 23,
+      "atttypmod": -1,
+      "attnum": 28,
+      "pg_type": "integer"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typcollation",
+      "atttypid": 26,
+      "atttypmod": -1,
+      "attnum": 29,
+      "pg_type": "oid"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typdefaultbin",
+      "atttypid": 194,
+      "atttypmod": -1,
+      "attnum": 30,
+      "pg_type": "pg_node_tree"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typdefault",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 31,
+      "pg_type": "text"
+    },
+    {
+      "relname": "pg_type",
+      "oid": 1247,
+      "attname": "typacl",
+      "atttypid": 1034,
+      "atttypmod": -1,
+      "attnum": 32,
+      "pg_type": "aclitem[]"
+    },
+    {
+      "relname": "pg_views",
+      "oid": 12028,
+      "attname": "schemaname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 1,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_views",
+      "oid": 12028,
+      "attname": "viewname",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 2,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_views",
+      "oid": 12028,
+      "attname": "viewowner",
+      "atttypid": 19,
+      "atttypmod": -1,
+      "attnum": 3,
+      "pg_type": "name"
+    },
+    {
+      "relname": "pg_views",
+      "oid": 12028,
+      "attname": "definition",
+      "atttypid": 25,
+      "atttypmod": -1,
+      "attnum": 4,
+      "pg_type": "text"
+    }
+  ]
+}

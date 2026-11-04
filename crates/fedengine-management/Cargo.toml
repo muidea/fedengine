@@ -1,0 +1,23 @@
+[package]
+name = "fedengine-management"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+fedengine-core.workspace = true
+fedengine-contract.workspace = true
+fedengine-datasource.workspace = true
+fedengine-catalog.workspace = true
+modorch.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+sha2 = "0.11"
+uuid = { workspace = true, features = ["v4"] }
+chrono.workspace = true

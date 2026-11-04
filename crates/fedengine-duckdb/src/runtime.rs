@@ -22,6 +22,8 @@ pub(super) struct DuckdbRuntime {
     pub(super) tasks: TaskScheduler,
     pub(super) config: Arc<Config>,
     pub(super) registry: ServiceHandle<DataSourceRegistry>,
+    pub(super) storage: Option<ServiceHandle<ManagementStorage>>,
+    pub(super) hub: modorch::EventHub,
 }
 #[async_trait]
 impl ExecutionPort for DuckdbRuntime {
@@ -64,10 +66,19 @@ impl ExecutionPort for DuckdbRuntime {
         self.tasks.spawn(move |shutdown|async move{
             tokio::select!{biased;_=done.cancelled()=>return Ok(()),_=token.cancelled()=>{},_=shutdown.cancelled()=>{},_=tokio::time::sleep_until(deadline.into())=>{}}
             token.cancel();
-            if let Some(h)=monitor_handle.lock().unwrap().as_ref(){h.interrupt();}
+            interrupt_until_finished(monitor_handle, done).await;
             Ok(())
         }).map_err(framework_error)?;
+        // Cancellation must keep observing a worker until its captures actually
+        // leave scope, including submission failure and panic unwinding.
+        let finished_guard = finished.drop_guard();
+        let ddl_source = request.ddl_source.clone();
+        let deferred = self.storage.is_some() && ddl_source.is_some() && !prepare;
+        let (completion_tx, completion_rx) = oneshot::channel();
+        let completion_tx = deferred.then_some(completion_tx);
+        let completion_sender = tx.clone();
         let submitted=self.tasks.spawn_blocking_io(move |_|{
+            let _finished=finished_guard;
             let _span = tracing::info_span!("execution", %operation_id, %fingerprint, operation=?kind, principal=%request.principal, session_id=request.session_id, sources=?request.generations.keys().collect::<Vec<_>>()).entered();
             let _worker=GaugeGuard::enter(metrics.active_workers.clone());
             let started = Instant::now();
@@ -77,9 +88,12 @@ impl ExecutionPort for DuckdbRuntime {
             let result=(||->Result<()>{
                 if request.cancel.is_cancelled(){return Err(EngineError::new("57014","query canceled before start"));}
                 let conn=root.lock().unwrap().try_clone().map_err(engine_error)?;
+                conn.execute_batch(fedengine_pg_compat::EXECUTION_SETTINGS).map_err(engine_error)?;
                 *interrupt.lock().unwrap()=Some(conn.interrupt_handle());
                 if request.cancel.is_cancelled(){return Err(EngineError::new("57014","query canceled before execution"));}
-                let result=run(&conn,&request,&config,&registry,WorkerOutput{sender:&tx,metadata:&mut metadata},&metrics);
+                if request.metadata.is_some(){conn.execute_batch("SET lambda_syntax='ENABLE_SINGLE_ARROW'; BEGIN TRANSACTION").map_err(engine_error)?;}
+                let result=run(&conn,&request,&config,&registry,WorkerOutput{sender:&tx,metadata:&mut metadata,completion:completion_tx},&metrics);
+                if request.metadata.is_some(){let _=conn.execute_batch("ROLLBACK");}
                 *interrupt.lock().unwrap()=None;
                 result
             })();
@@ -95,11 +109,38 @@ impl ExecutionPort for DuckdbRuntime {
             }
             metrics.execution_micros.fetch_add(started.elapsed().as_micros().min(u64::MAX as u128) as u64,Ordering::Relaxed);
             tracing::info!(elapsed_ms=started.elapsed().as_millis(),"worker exited");
-            finished.cancel();Ok(())
+            Ok(())
         });
-        if let Err(e) = submitted {
-            cancel.cancel();
-            return Err(framework_error(e));
+        let job = match submitted {
+            Ok(job) => job,
+            Err(error) => {
+                cancel.cancel();
+                return Err(framework_error(error));
+            }
+        };
+        if let Some(storage) = &self.storage
+            && let Some(source) = ddl_source
+            && !prepare
+        {
+            let hub = self.hub.clone();
+            let registry = self.registry.acquire().map_err(framework_error)?;
+            let storage = storage.acquire().map_err(framework_error)?;
+            let static_mode = !self.config.management.enabled;
+            let timeout = Duration::from_millis(self.config.management.request_timeout_ms);
+            self.tasks.spawn(move |_| async move {
+                // wait_finished, rather than wait, guarantees lease/fence release.
+                job.wait_finished().await?;
+                let confirmed = completion_rx.await.ok();
+                let needs_refresh = static_mode || registry.get(&source).is_ok_and(|s| s.stale.load(Ordering::SeqCst));
+                let fresh = !needs_refresh || crate::ddl_refresh::refresh(&hub, &storage, &registry, &source, timeout.min(deadline.saturating_duration_since(Instant::now()))).await;
+                if let Some(mut completion) = confirmed {
+                    if !fresh {
+                        completion.notices.push((uuid::Uuid::new_v4().to_string(), "DDL committed; metadata refresh failed or is still pending. Inspect the source management status before issuing further statements; do not retry the DDL.".into()));
+                    }
+                    let _ = completion_sender.send(ResultChunk::Complete(completion)).await;
+                }
+                Ok(())
+            }).map_err(framework_error)?;
         }
         // Scheduler owns the worker independently of the waiting caller.
         match meta_rx
@@ -110,6 +151,8 @@ impl ExecutionPort for DuckdbRuntime {
                 columns,
                 parameters,
             } if prepare => Ok(RuntimeReply::Prepared(PreparedDescriptor {
+                namespace_version: 0,
+                database_version: None,
                 sql,
                 parameters,
                 columns,
@@ -165,5 +208,101 @@ impl ExecutionPort for DuckdbRuntime {
             .wait_finished()
             .await
             .map_err(framework_error)?
+    }
+}
+
+#[async_trait]
+impl RuntimeControlPort for DuckdbRuntime {
+    async fn control(
+        &self,
+        action: ControlAction,
+        ownership: Box<dyn Send>,
+    ) -> Result<ControlOutcome> {
+        let root = self.root.clone();
+        let config = self.config.clone();
+        // Control work has independent scheduler quota; it never waits for query slots.
+        self.tasks
+            .spawn_blocking_io(move |_| {
+                let _ownership = ownership;
+                let conn = root
+                    .lock()
+                    .unwrap()
+                    .try_clone()
+                    .map_err(engine_error)
+                    .map_err(fw)?;
+                Ok(crate::control::execute(&conn, &config, action))
+            })
+            .map_err(framework_error)?
+            .wait_finished()
+            .await
+            .map_err(framework_error)?
+    }
+}
+
+/// DuckDB clears the interrupt flag at the start of a native statement. An
+/// execution has setup/describe/stream/cleanup statements, so one interrupt can
+/// be consumed before the expensive statement begins. Keep cancellation armed
+/// until the actual worker exits; never infer that a write rolled back.
+async fn interrupt_until_finished(
+    handle: Arc<Mutex<Option<Arc<InterruptHandle>>>>,
+    done: CancellationToken,
+) {
+    loop {
+        if done.is_cancelled() {
+            return;
+        }
+        let current = handle.lock().unwrap().clone();
+        if let Some(current) = current {
+            current.interrupt();
+        }
+        tokio::select! {biased;_=done.cancelled()=>return, _=tokio::time::sleep(Duration::from_millis(20))=>{}}
+    }
+}
+
+#[cfg(test)]
+mod cancellation_tests {
+    use super::*;
+    #[tokio::test]
+    async fn cancellation_survives_native_statement_reset_and_drains_monitor() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("SET threads=1").unwrap();
+        let interrupt = conn.interrupt_handle();
+        interrupt.interrupt();
+        assert_eq!(
+            conn.query_row("SELECT 1", [], |r| r.get::<_, i32>(0))
+                .unwrap(),
+            1,
+            "a new native statement resets an earlier interrupt"
+        );
+        let handle = Arc::new(Mutex::new(Some(interrupt.clone())));
+        let done = CancellationToken::new();
+        let monitor = tokio::spawn(interrupt_until_finished(handle, done.clone()));
+        // Allow the initial interrupt to precede the next native statement,
+        // exactly the setup -> describe/execute race of a canceled worker.
+        tokio::time::sleep(Duration::from_millis(60)).await;
+        let exit = done.drop_guard();
+        let mut worker = tokio::task::spawn_blocking(move || {
+            let _exit = exit;
+            conn.query_row(
+                "SELECT sum(a.i*b.i) FROM range(1000000000) a(i), range(1000000000) b(i)",
+                [],
+                |r| r.get::<_, i64>(0),
+            )
+        });
+        let result = tokio::time::timeout(Duration::from_secs(3), &mut worker).await;
+        if result.is_err() {
+            // Clean up even when this assertion regresses, instead of leaving
+            // an unkillable blocking test task at runtime shutdown.
+            interrupt.interrupt();
+            let _ = worker.await;
+            monitor.await.unwrap();
+            panic!("cancellation was lost when the native statement reset its interrupt flag");
+        }
+        let error = result.unwrap().unwrap().unwrap_err();
+        assert_eq!(engine_error(error).sqlstate, "57014");
+        tokio::time::timeout(Duration::from_secs(1), monitor)
+            .await
+            .unwrap()
+            .unwrap();
     }
 }

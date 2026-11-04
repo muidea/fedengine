@@ -116,6 +116,7 @@ impl ExtendedQueryHandler for Backend {
         match client.portal_store().get_statement(statement) {
             Some(Entry::Value(stmt)) => {
                 let d = &stmt.statement;
+                self.check_prepared(client, d).await?;
                 if message.parameters.len() != d.parameters.len() {
                     return Err(pg_error(EngineError::new(
                         "08P01",
@@ -124,14 +125,88 @@ impl ExtendedQueryHandler for Backend {
                 }
                 validate_formats(&message.parameter_format_codes, d.parameters.len())?;
                 validate_formats(&message.result_column_format_codes, d.columns.len())?;
-                let portal = Portal::try_new(&message, stmt)?;
+                let mut portal = Portal::try_new(&message, stmt)?;
+                let mut names = Vec::new();
+                let mut formats = Vec::new();
                 for (i, t) in portal.statement.statement.parameters.iter().enumerate() {
-                    decode_parameter(
-                        portal.parameters[i].as_deref(),
-                        *t,
-                        portal.parameter_format.is_binary(i),
-                    )
-                    .map_err(pg_error)?;
+                    let binary = portal.parameter_format.is_binary(i);
+                    formats.push(i16::from(binary));
+                    if *t == PgType::Catalog(2205)
+                        && !binary
+                        && let Some(bytes) = portal.parameters[i].as_deref()
+                    {
+                        // Scalar codecs have no namespace. Resolve textual names
+                        // through the normal scoped query/worker boundary at Bind,
+                        // then freeze the OID in the portal, never a late-bound name.
+                        if bytes.len() > 1024 * 1024 {
+                            return Err(pg_error(EngineError::new(
+                                "54000",
+                                "parameter exceeds 1 MiB limit",
+                            )));
+                        }
+                        let text = std::str::from_utf8(bytes).map_err(|_| {
+                            pg_error(EngineError::new("22021", "parameter is not valid UTF-8"))
+                        })?;
+                        if fedengine_pg_compat::regclass_numeric_input(text)
+                            .map_err(pg_error)?
+                            .is_none()
+                        {
+                            names.push((
+                                i,
+                                format!(
+                                    "CAST(CAST({} AS regclass) AS oid)",
+                                    fedengine_core::quote_literal(text)
+                                ),
+                            ));
+                            continue;
+                        }
+                    }
+                    decode_parameter(portal.parameters[i].as_deref(), *t, binary)
+                        .map_err(pg_error)?;
+                }
+                if !names.is_empty() {
+                    let d = &portal.statement.statement;
+                    let sql = format!(
+                        "SELECT {}",
+                        names
+                            .iter()
+                            .map(|(_, e)| e.as_str())
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    );
+                    let mut cursor = self
+                        .cursor(
+                            client,
+                            sql,
+                            vec![],
+                            vec![],
+                            d.generations.clone(),
+                            d.database_version,
+                        )
+                        .await?;
+                    let row = cursor.next().await?.ok_or_else(|| {
+                        pg_error(EngineError::new(
+                            "XX000",
+                            "regclass resolution returned no row",
+                        ))
+                    })?;
+                    if cursor.next().await?.is_some() {
+                        return Err(pg_error(EngineError::new(
+                            "XX000",
+                            "regclass resolution returned multiple rows",
+                        )));
+                    }
+                    for ((i, _), value) in names.iter().zip(row) {
+                        let Cell::Oid(oid) = value else {
+                            return Err(pg_error(EngineError::new(
+                                "XX000",
+                                "regclass resolution returned an invalid OID",
+                            )));
+                        };
+                        portal.parameters[*i] = Some(oid.to_be_bytes().to_vec().into());
+                        formats[*i] = 1;
+                    }
+                    portal.parameter_format = Format::Individual(formats);
                 }
                 client.portal_store().put_portal(Arc::new(portal));
             }
@@ -182,11 +257,19 @@ impl ExtendedQueryHandler for Backend {
                     .await?;
                 return Ok(());
             }
-            None => return Err(PgWireError::PortalNotFound(name)),
+            None => return Err(pg_error(EngineError::new("34000", "portal does not exist"))),
         };
+        self.check_prepared(client, &portal.statement.statement)
+            .await?;
         let mut cursor = self.cursors.lock().await.remove(&name);
         if cursor.is_none() {
             let s = &portal.statement.statement;
+            if s.namespace_version != self.session(client).namespace_version {
+                return Err(pg_error(EngineError::new(
+                    "0A000",
+                    "session namespace changed; Parse/Bind the statement again",
+                )));
+            }
             let parameters = s
                 .parameters
                 .iter()
@@ -207,15 +290,18 @@ impl ExtendedQueryHandler for Backend {
                     parameters,
                     s.parameters.clone(),
                     s.generations.clone(),
+                    s.database_version,
                 )
                 .await?,
             );
         }
         let mut cursor = cursor.unwrap();
+        self.send_notices(client, &mut cursor).await?;
         let mut count = 0usize;
         client.set_state(PgWireConnectionState::QueryInProgress);
         loop {
             if cursor.completion.is_some() {
+                self.send_notices(client, &mut cursor).await?;
                 send(
                     client,
                     PgWireBackendMessage::CommandComplete(cursor.tag().into()),
@@ -271,9 +357,32 @@ impl ExtendedQueryHandler for Backend {
             "use streaming on_execute",
         )))
     }
+    async fn on_describe<C>(&self, client: &mut C, message: Describe) -> PgWireResult<()>
+    where
+        C: ClientInfo
+            + ClientPortalStore
+            + Sink<PgWireBackendMessage>
+            + Unpin
+            + Send
+            + std::marker::Sync,
+        C::PortalStore: PortalStore<Statement = PreparedDescriptor>,
+        C::Error: Debug,
+        PgWireError: From<<C as Sink<PgWireBackendMessage>>::Error>,
+    {
+        // pgwire 0.42.1 maps PortalNotFound to the Statement SQLSTATE 26000.
+        // Retain its Describe implementation but correct this public error boundary.
+        self._on_describe(client, message)
+            .await
+            .map_err(|error| match error {
+                PgWireError::PortalNotFound(_) => {
+                    pg_error(EngineError::new("34000", "portal does not exist"))
+                }
+                error => error,
+            })
+    }
     async fn do_describe_statement<C>(
         &self,
-        _: &mut C,
+        client: &mut C,
         target: &StoredStatement<PreparedDescriptor>,
     ) -> PgWireResult<DescribeStatementResponse>
     where
@@ -287,6 +396,7 @@ impl ExtendedQueryHandler for Backend {
         C::Error: Debug,
         PgWireError: From<<C as Sink<PgWireBackendMessage>>::Error>,
     {
+        self.check_prepared(client, &target.statement).await?;
         Ok(DescribeStatementResponse::new(
             self.get_parameter_types(&target.statement)?,
             fields(&target.statement.columns, &Format::UnifiedText),
@@ -294,7 +404,7 @@ impl ExtendedQueryHandler for Backend {
     }
     async fn do_describe_portal<C>(
         &self,
-        _: &mut C,
+        client: &mut C,
         target: &Portal<PreparedDescriptor>,
     ) -> PgWireResult<DescribePortalResponse>
     where
@@ -308,6 +418,8 @@ impl ExtendedQueryHandler for Backend {
         C::Error: Debug,
         PgWireError: From<<C as Sink<PgWireBackendMessage>>::Error>,
     {
+        self.check_prepared(client, &target.statement.statement)
+            .await?;
         Ok(DescribePortalResponse::new(fields(
             &target.statement.statement.columns,
             &target.result_column_format,

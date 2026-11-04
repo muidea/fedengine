@@ -13,5 +13,6 @@ fedengine-datasource.workspace = true
 fedengine-ddl.workspace = true
 fedengine-policy.workspace = true
 fedengine-catalog.workspace = true
+fedengine-pg-compat.workspace = true
 modorch.workspace = true
 tokio.workspace = true

@@ -1,5 +1,5 @@
 //! Versioned control messages and protocol independent streaming contracts.
-use fedengine_core::{DataSourceId, EngineError, Result};
+use fedengine_core::{DataSourceId, EngineError, Result, SourceVersion};
 use std::{
     collections::BTreeMap,
     sync::{Arc, Mutex},
@@ -11,6 +11,7 @@ use tokio_util::sync::CancellationToken;
 pub const QUERY_TOPIC: &str = "query/execute/v1";
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StatementKind {
+    Session,
     Query,
     Insert,
     Update,
@@ -19,11 +20,13 @@ pub enum StatementKind {
 }
 impl StatementKind {
     pub fn writes(self) -> bool {
-        self != Self::Query
+        matches!(self, Self::Insert | Self::Update | Self::Delete | Self::Ddl)
     }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PgType {
+    /// Explicit PostgreSQL catalog scalar/vector/array type; never inferred from a column name.
+    Catalog(u32),
     Bool,
     Int2,
     Int4,
@@ -43,6 +46,14 @@ pub enum PgType {
 impl PgType {
     pub fn duckdb_name(self) -> &'static str {
         match self {
+            Self::Catalog(26 | 28 | 29 | 24 | 2205 | 2206) => "UINTEGER",
+            Self::Catalog(22 | 1005) => "SMALLINT[]",
+            Self::Catalog(30 | 1028) => "UINTEGER[]",
+            Self::Catalog(1007) => "INTEGER[]",
+            Self::Catalog(1016) => "BIGINT[]",
+            Self::Catalog(1000) => "BOOLEAN[]",
+            Self::Catalog(1002 | 1003 | 1009 | 1014 | 1015 | 1034) => "VARCHAR[]",
+            Self::Catalog(_) => "VARCHAR",
             Self::Bool => "BOOLEAN",
             Self::Int2 => "SMALLINT",
             Self::Int4 => "INTEGER",
@@ -62,6 +73,7 @@ impl PgType {
     }
     pub fn oid(self) -> u32 {
         match self {
+            Self::Catalog(oid) => oid,
             Self::Bool => 16,
             Self::Int2 => 21,
             Self::Int4 => 23,
@@ -81,6 +93,10 @@ impl PgType {
     }
     pub fn from_oid(oid: u32) -> Option<Self> {
         Some(match oid {
+            18 | 19 | 22 | 24 | 26 | 28 | 29 | 30 | 194 | 1000 | 1002 | 1003 | 1005 | 1007
+            | 1009 | 1014 | 1015 | 1016 | 1021 | 1022 | 1028 | 1034 | 2205 | 2206 | 2277 => {
+                Self::Catalog(oid)
+            }
             16 => Self::Bool,
             21 => Self::Int2,
             23 => Self::Int4,
@@ -102,6 +118,16 @@ impl PgType {
 }
 #[derive(Debug, Clone)]
 pub enum Cell {
+    Oid(u32),
+    /// An OID value with snapshot-scoped PG text output; binary remains an OID.
+    NamedOid {
+        oid: u32,
+        name: String,
+    },
+    Array {
+        lower_bound: i32,
+        values: Vec<Cell>,
+    },
     Null,
     Bool(bool),
     I16(i16),
@@ -121,14 +147,50 @@ pub enum Cell {
 pub struct ColumnMeta {
     pub name: String,
     pub data_type: PgType,
+    pub type_modifier: i32,
+    pub table_oid: Option<u32>,
+    pub column_attnum: Option<i16>,
+}
+impl ColumnMeta {
+    pub fn new(name: impl Into<String>, data_type: PgType) -> Self {
+        Self {
+            name: name.into(),
+            data_type,
+            type_modifier: -1,
+            table_oid: None,
+            column_attnum: None,
+        }
+    }
+}
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SessionContext {
+    pub database: String,
+    /// Identity admitted at startup, never rebound by a later same-name creation.
+    pub database_oid: Option<u32>,
+    /// None selects the effective source default; Some(empty) explicitly disables short names.
+    pub search_path: Option<Vec<SessionIdentifier>>,
+    pub namespace_version: u64,
+    pub settings: BTreeMap<String, String>,
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionIdentifier {
+    pub name: String,
+    pub quoted: bool,
 }
 #[derive(Debug, Clone)]
 pub struct PreparedDescriptor {
+    pub namespace_version: u64,
+    pub database_version: Option<DatabaseVersion>,
     pub sql: String,
     pub parameters: Vec<PgType>,
     pub columns: Vec<ColumnMeta>,
-    pub generations: BTreeMap<DataSourceId, u64>,
+    pub generations: BTreeMap<DataSourceId, SourceVersion>,
     pub kind: StatementKind,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DatabaseVersion {
+    pub oid: u32,
+    pub revision: u64,
 }
 #[derive(Debug, Clone)]
 pub enum QueryMode {
@@ -138,11 +200,13 @@ pub enum QueryMode {
     Execute {
         parameters: Vec<Cell>,
         parameter_types: Vec<PgType>,
-        expected: BTreeMap<DataSourceId, u64>,
+        expected: BTreeMap<DataSourceId, SourceVersion>,
+        expected_database: Option<DatabaseVersion>,
     },
 }
 #[derive(Debug, Clone)]
 pub struct QueryRequest {
+    pub session: SessionContext,
     pub principal: String,
     pub session_id: i32,
     pub sql: String,
@@ -155,6 +219,7 @@ pub enum QueryReply {
     Accepted(AcceptedExecution),
 }
 pub struct AcceptedExecution {
+    pub notices: Vec<(String, String)>,
     pub columns: Vec<ColumnMeta>,
     pub kind: StatementKind,
     stream: Mutex<Option<ExecutionStream>>,
@@ -162,6 +227,7 @@ pub struct AcceptedExecution {
 impl AcceptedExecution {
     pub fn new(columns: Vec<ColumnMeta>, kind: StatementKind, stream: ExecutionStream) -> Self {
         Self {
+            notices: vec![],
             columns,
             kind,
             stream: Mutex::new(Some(stream)),
@@ -177,6 +243,8 @@ impl AcceptedExecution {
 }
 #[derive(Debug, Clone)]
 pub struct Completion {
+    /// Diagnostics after a confirmed commit, never a claim that the write rolled back.
+    pub notices: Vec<(String, String)>,
     pub command: String,
     pub affected_rows: Option<u64>,
     pub outcome: ExecutionOutcome,
@@ -207,6 +275,8 @@ pub struct ExecutionService {
     pub port: Arc<dyn ExecutionPort>,
 }
 pub struct ExecuteRequest {
+    /// Present only for the validated, local-only system metadata execution path.
+    pub metadata: Option<MetadataExecution>,
     pub principal: String,
     pub session_id: i32,
     pub sql: String,
@@ -214,11 +284,38 @@ pub struct ExecuteRequest {
     pub parameters: Vec<Cell>,
     pub parameter_types: Vec<Option<PgType>>,
     pub prepare_only: bool,
-    pub generations: BTreeMap<DataSourceId, u64>,
+    pub generations: BTreeMap<DataSourceId, SourceVersion>,
     pub deadline: Instant,
     pub cancel: CancellationToken,
     pub ddl_source: Option<DataSourceId>,
     pub command: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct MetadataExecution {
+    pub scope: MetadataScope,
+    pub columns: Vec<Option<ColumnMeta>>,
+    pub search_path: Vec<String>,
+}
+#[derive(Debug, Clone)]
+pub struct VisibleCatalog {
+    pub id: DataSourceId,
+    pub catalog: String,
+    pub snapshot_id: String,
+    pub database_oid: u32,
+    pub schemas: Vec<String>,
+    pub default_schema: String,
+    pub grants: Vec<fedengine_core::Grant>,
+    pub stale: bool,
+    pub mapping: Option<fedengine_core::VirtualSchemaConfig>,
+}
+#[derive(Debug, Clone, Default)]
+pub struct MetadataScope {
+    pub database: String,
+    pub principal: String,
+    pub catalogs: Vec<VisibleCatalog>,
+    pub virtual_database: Option<fedengine_core::VirtualDatabase>,
+    pub databases: Vec<fedengine_core::VirtualDatabase>,
 }
 pub enum RuntimeReply {
     Prepared(PreparedDescriptor),
@@ -312,4 +409,210 @@ impl Drop for GaugeGuard {
     fn drop(&mut self) {
         self.0.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
     }
+}
+
+/// A short local transaction. The closure must never perform network I/O or wait for locks.
+pub type ManagementUpdate =
+    Box<dyn FnOnce(&mut fedengine_core::ManagementState) -> Result<()> + Send>;
+#[derive(Clone)]
+pub struct ManagementStorage {
+    pub port: Arc<dyn ManagementStore>,
+}
+#[async_trait::async_trait]
+pub trait ManagementStore: Send + Sync {
+    async fn read(&self) -> Result<fedengine_core::ManagementState>;
+    async fn update(&self, update: ManagementUpdate) -> Result<fedengine_core::ManagementState>;
+    /// Caller transfers the instance barrier and service leases to the actual writer task.
+    async fn virtual_database_mutation(
+        &self,
+        mutation: VirtualDatabaseMutation,
+        key: String,
+        users: std::collections::BTreeSet<String>,
+        ownership: Box<dyn Send>,
+    ) -> Result<VirtualDatabaseReceipt> {
+        let _ = (mutation, key, users, ownership);
+        Err(EngineError::unsupported(
+            "virtual database writer is unavailable",
+        ))
+    }
+    /// Small effective heads only; never loads the object payloads of unrelated catalogs.
+    async fn relation_names(
+        &self,
+        _snapshot: String,
+    ) -> Result<std::collections::BTreeSet<(String, String)>> {
+        Err(EngineError::unsupported(
+            "catalog name reader is unavailable",
+        ))
+    }
+    async fn catalog_headers(&self) -> Result<CatalogHeads> {
+        Err(EngineError::unsupported(
+            "catalog header reader is unavailable",
+        ))
+    }
+    async fn directory(&self, request: DirectoryRequest) -> Result<CatalogPage> {
+        let _ = request;
+        Err(EngineError::unsupported(
+            "catalog directory reader is unavailable",
+        ))
+    }
+}
+#[derive(Debug, Clone, Default)]
+pub struct CatalogHeads {
+    pub sources: Vec<CatalogHeader>,
+    pub databases: Vec<fedengine_core::VirtualDatabase>,
+}
+impl From<Vec<CatalogHeader>> for CatalogHeads {
+    fn from(sources: Vec<CatalogHeader>) -> Self {
+        Self {
+            sources,
+            databases: vec![],
+        }
+    }
+}
+impl std::ops::Deref for CatalogHeads {
+    type Target = Vec<CatalogHeader>;
+    fn deref(&self) -> &Self::Target {
+        &self.sources
+    }
+}
+#[derive(Debug, Clone)]
+pub struct CatalogHeader {
+    pub source: fedengine_core::ManagedSource,
+    pub applied: Option<fedengine_core::SourceRevision>,
+    pub snapshot: Option<fedengine_core::CatalogSnapshot>,
+}
+#[derive(Debug, Clone)]
+pub struct DirectoryRequest {
+    pub id: DataSourceId,
+    pub schema: Option<String>,
+    pub object_type: Option<String>,
+    pub object: Option<String>,
+    pub snapshot_id: Option<String>,
+    pub offset: usize,
+    pub limit: usize,
+}
+#[derive(Clone)]
+pub struct RuntimeControl {
+    pub port: Arc<dyn RuntimeControlPort>,
+}
+#[derive(Clone)]
+pub enum ControlAction {
+    Inspect {
+        revision: fedengine_core::SourceRevision,
+        reuse_attached: bool,
+    },
+    Switch {
+        previous: Option<fedengine_core::SourceRevision>,
+        next: fedengine_core::SourceRevision,
+    },
+    Disable(fedengine_core::SourceRevision),
+    Refresh(fedengine_core::SourceRevision),
+}
+pub struct ControlOutcome {
+    pub schemas: Vec<String>,
+    pub catalog: Option<fedengine_core::CatalogSnapshot>,
+    /// True only after the previous applied definition was successfully reattached.
+    pub restored_previous: bool,
+    pub error: Option<EngineError>,
+}
+#[async_trait::async_trait]
+pub trait RuntimeControlPort: Send + Sync {
+    /// Caller owns the instance write barrier, then sorted source locks.
+    /// Ownership (including service leases) survives until blocking I/O really exits.
+    async fn control(
+        &self,
+        action: ControlAction,
+        ownership: Box<dyn Send>,
+    ) -> Result<ControlOutcome>;
+}
+
+pub const MANAGEMENT_TOPIC: &str = "management/control/v1";
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct VirtualDatabaseTarget {
+    pub oid: u32,
+    pub expected_revision: u64,
+}
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
+pub enum VirtualDatabaseMutation {
+    Create {
+        definition: fedengine_core::VirtualDatabaseConfig,
+    },
+    Replace {
+        name: String,
+        target: VirtualDatabaseTarget,
+        definition: fedengine_core::VirtualDatabaseConfig,
+    },
+    Delete {
+        name: String,
+        target: VirtualDatabaseTarget,
+    },
+}
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct VirtualDatabaseReceipt {
+    pub idempotency_key: String,
+    pub name: String,
+    pub oid: u32,
+    pub revision: u64,
+    pub deleted: bool,
+}
+#[derive(Clone)]
+pub enum ManagementRequest {
+    VirtualDatabases,
+    VirtualDatabase(String),
+    MutateVirtualDatabase {
+        mutation: VirtualDatabaseMutation,
+        idempotency_key: String,
+    },
+    Submit {
+        action: fedengine_core::ManagementAction,
+        idempotency_key: String,
+    },
+    List,
+    Get(DataSourceId),
+    Operation(String),
+    Catalog {
+        object: Option<String>,
+        snapshot_id: Option<String>,
+        id: DataSourceId,
+        schema: Option<String>,
+        object_type: Option<String>,
+        offset: usize,
+        limit: usize,
+    },
+    /// Trusted notification after confirmed DDL; never exposed as an HTTP action.
+    DdlInvalidated(DataSourceId),
+}
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SourceView {
+    #[serde(flatten)]
+    pub source: fedengine_core::ManagedSource,
+    pub desired: fedengine_core::SourceRevision,
+    pub applied: Option<fedengine_core::SourceRevision>,
+    pub catalog_updated_at: Option<String>,
+}
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct CatalogPage {
+    pub snapshot_id: String,
+    pub incarnation: String,
+    pub revision: u64,
+    pub generation: u64,
+    pub refreshed_at: String,
+    pub stale: bool,
+    pub schemas: Vec<String>,
+    pub total: usize,
+    pub offset: usize,
+    pub objects: Vec<fedengine_core::CatalogObject>,
+}
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(untagged)]
+pub enum ManagementReply {
+    VirtualDatabases(Vec<fedengine_core::VirtualDatabase>),
+    VirtualDatabase(fedengine_core::VirtualDatabase),
+    VirtualDatabaseReceipt(VirtualDatabaseReceipt),
+    Sources(Vec<SourceView>),
+    Source(Box<SourceView>),
+    Operation(fedengine_core::ManagementOperation),
+    Catalog(CatalogPage),
 }

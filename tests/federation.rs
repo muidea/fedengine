@@ -14,6 +14,8 @@ async fn remote_crud_federation_ddl_index_generation_and_zero_cross_source_effec
         .try_init();
     let temporary = TestDirectory::new();
     let mut config = Config::load("examples/config/federation.toml").unwrap();
+    config.management.enabled = false;
+    config.duckdb.database_path = ":memory:".into();
     config.pgwire.listen = "127.0.0.1:0".into();
     config.users[0].password_secret_ref = "USER".into();
     config.duckdb.install_extensions = false;
@@ -118,9 +120,70 @@ async fn remote_crud_federation_ddl_index_generation_and_zero_cross_source_effec
         .host("127.0.0.1")
         .port(engine.address().unwrap().port())
         .user("fedengine")
+        .dbname("pg_crm")
         .password(std::env::var("USER").unwrap());
     let (client, connection) = connection_config.connect(NoTls).await.unwrap();
     let driver = tokio::spawn(async move { connection.await.unwrap() });
+    // Regression: remote catalog attachment changes DuckDB's positional macro
+    // overload binding. Explicit casts and binary parameters must still divide.
+    assert_eq!(
+        client
+            .query_one("SELECT 5::integer/2::integer", &[])
+            .await
+            .unwrap()
+            .get::<_, i32>(0),
+        2
+    );
+    assert_eq!(
+        client
+            .query_one("SELECT $1::bigint/$2::bigint", &[&5i64, &2i64])
+            .await
+            .unwrap()
+            .get::<_, i64>(0),
+        2
+    );
+    assert_eq!(
+        client
+            .query_one("SELECT 5::real/2::real", &[])
+            .await
+            .unwrap()
+            .get::<_, f32>(0),
+        2.5
+    );
+    let error = client
+        .simple_query("SELECT 1::integer/0::integer")
+        .await
+        .unwrap_err();
+    assert_eq!(error.code().unwrap().code(), "22012");
+    let databases: Vec<String> = client
+        .query(
+            "SELECT datname FROM pg_catalog.pg_database WHERE datallowconn ORDER BY datname",
+            &[],
+        )
+        .await
+        .unwrap()
+        .iter()
+        .map(|row| row.get(0))
+        .collect();
+    assert_eq!(databases, ["mysql_erp", "pg_crm"]);
+    let namespaces: Vec<String> = client
+        .query(
+            "SELECT nspname FROM pg_catalog.pg_namespace ORDER BY nspname",
+            &[],
+        )
+        .await
+        .unwrap()
+        .iter()
+        .map(|row| row.get(0))
+        .collect();
+    assert_eq!(namespaces, ["information_schema", "pg_catalog", "public"]);
+    for sql in [
+        "SELECT * FROM fedengine_metadata.catalog_status",
+        "SELECT * FROM _fedengine.meta_pg_database",
+        "SELECT * FROM pg_crm._fedengine.meta_pg_database",
+    ] {
+        assert!(client.simple_query(sql).await.is_err(), "{sql}");
+    }
     for (alias, schema) in [("pg_crm", "public"), ("mysql_erp", "erp")] {
         let table = format!("{alias}.{schema}.fedengine_test_items");
         client

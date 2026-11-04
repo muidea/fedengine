@@ -1,5 +1,5 @@
 use crate::{
-    codec::{cell, pg_type, to_duckdb},
+    codec::{cell, to_duckdb},
     error::engine_error,
     metadata::describe,
 };
@@ -14,6 +14,7 @@ use std::{
 use tokio::sync::{mpsc, oneshot};
 pub(super) struct WorkerOutput<'a> {
     pub(super) sender: &'a mpsc::Sender<ResultChunk>,
+    pub(super) completion: Option<oneshot::Sender<Completion>>,
     pub(super) metadata: &'a mut Option<oneshot::Sender<Result<Metadata>>>,
 }
 pub(super) struct Metadata {
@@ -28,9 +29,40 @@ pub(super) fn run(
     output: WorkerOutput<'_>,
     metrics: &EngineMetrics,
 ) -> Result<()> {
+    if r.cancel.is_cancelled() {
+        return Err(EngineError::new(
+            "57014",
+            "query canceled before preparing execution",
+        ));
+    }
+    if let Some(metadata) = &r.metadata {
+        for catalog in &metadata.scope.catalogs {
+            let exists: i64 = conn
+                .query_row(
+                    "SELECT count(*) FROM _fedengine.metadata_projection_state WHERE snapshot_id=?",
+                    [&catalog.snapshot_id],
+                    |row| row.get(0),
+                )
+                .map_err(engine_error)?;
+            if exists != 1 {
+                return Err(EngineError::new(
+                    "40001",
+                    "metadata snapshot retired before execution; retry the query",
+                ));
+            }
+        }
+    }
     let tx = output.sender;
     let metadata = output.metadata;
-    let mut stmt = conn.prepare(&r.sql).map_err(engine_error)?;
+    let overrides = r.metadata.as_ref().map(|m| m.columns.as_slice());
+    let sql = fedengine_pg_compat::execution_sql(&r.sql)?;
+    let mut stmt = conn.prepare(&sql).map_err(engine_error)?;
+    if r.cancel.is_cancelled() {
+        return Err(EngineError::new(
+            "57014",
+            "query canceled during preparation",
+        ));
+    }
     let count = stmt.parameter_count();
     if count != r.parameter_types.len() && r.prepare_only {
         return Err(EngineError::new(
@@ -52,7 +84,7 @@ pub(super) fn run(
         .collect::<Result<_>>()?;
     if r.prepare_only {
         let columns = if r.kind == StatementKind::Query {
-            describe(conn, &r.sql, count)?
+            describe(conn, &sql, count, overrides)?
         } else {
             vec![]
         };
@@ -88,55 +120,63 @@ pub(super) fn run(
         };
         if let Some(source) = &r.ddl_source {
             metrics.ddl_confirmed.fetch_add(1, Ordering::Relaxed);
-            registry.invalidate(source, false)?;
-            let s = registry.get(source)?;
-            let refresh = match s.definition.kind {
-                DataSourceKind::Mysql => conn.execute_batch("CALL mysql_clear_cache()"),
-                DataSourceKind::Postgres => conn.execute_batch("CALL postgres_clear_cache()"),
-            };
-            if refresh.is_err() {
-                s.stale.store(true, Ordering::SeqCst);
-                metrics.metadata_stale.fetch_add(1, Ordering::Relaxed);
-                tracing::error!(source=?source,"DDL committed; metadata refresh failed; source marked stale");
+            if c.management.enabled {
+                // Publish invalidation immediately. Refresh is coordinated after this worker
+                // releases its source fence and instance read lease; DDL is never replayed.
+                registry.invalidate(source, true)?;
+            } else {
+                registry.invalidate(source, false)?;
+                let source = registry.get(source)?;
+                if conn
+                    .execute_batch(&format!(
+                        "CALL {}_clear_cache()",
+                        source.definition.kind.extension()
+                    ))
+                    .is_err()
+                {
+                    source.stale.store(true, Ordering::SeqCst);
+                    metrics.metadata_stale.fetch_add(1, Ordering::Relaxed);
+                }
             }
         }
         tracing::info!(operation=?r.kind,affected_rows=n,"commit confirmed");
-        send_chunk(
-            tx,
-            ResultChunk::Complete(Completion {
-                command: r.command.clone(),
-                affected_rows: if r.kind == StatementKind::Ddl {
-                    None
-                } else {
-                    Some(n as u64)
-                },
-                outcome: ExecutionOutcome::CommitConfirmed,
-            }),
-            r,
-        )
-        .ok();
+        let completion = Completion {
+            notices: vec![],
+            command: r.command.clone(),
+            affected_rows: if r.kind == StatementKind::Ddl {
+                None
+            } else {
+                Some(n)
+            },
+            outcome: ExecutionOutcome::CommitConfirmed,
+        };
+        if let Some(deferred) = output.completion {
+            // Release connection, source fences and instance lease before refresh.
+            // The runtime publishes this completion after the publication barrier.
+            let _ = deferred.send(completion);
+            return Ok(());
+        }
+        send_chunk(tx, ResultChunk::Complete(completion), r).ok();
     } else {
         let values = r.parameters.iter().map(to_duckdb).collect::<Vec<_>>();
-        let described_columns = describe(conn, &r.sql, count)?;
+        let described_columns = describe(conn, &sql, count, overrides)?;
+        if r.cancel.is_cancelled() {
+            return Err(EngineError::new("57014", "query canceled before streaming"));
+        }
+        let columns = described_columns;
+        let row_types: Vec<_> = columns.iter().map(|c| c.data_type).collect();
+        let regclass_names = if row_types.contains(&PgType::Catalog(2205)) {
+            r.metadata
+                .as_ref()
+                .map(|m| regclass_names(conn, m))
+                .transpose()?
+                .unwrap_or_default()
+        } else {
+            Default::default()
+        };
         let mut stream = stmt
             .stream_arrow(params_from_iter(values.iter()))
             .map_err(engine_error)?;
-        let schema = stream.get_schema();
-        let columns = schema
-            .fields()
-            .iter()
-            .map(|f| {
-                Ok(ColumnMeta {
-                    name: f.name().clone(),
-                    data_type: pg_type(f.data_type())?,
-                })
-            })
-            .collect::<Result<Vec<_>>>()?;
-        let columns = if described_columns.len() == columns.len() {
-            described_columns
-        } else {
-            columns
-        };
         let _ = metadata.take().unwrap().send(Ok(Metadata {
             columns,
             parameters: types,
@@ -155,7 +195,26 @@ pub(super) fn run(
                         batch
                             .columns()
                             .iter()
-                            .map(|a| cell(a.as_ref(), row))
+                            .zip(&row_types)
+                            .map(|(a, t)| {
+                                let value = cell(a.as_ref(), row)
+                                    .and_then(|c| crate::codec::coerce(c, *t))?;
+                                Ok(if *t == PgType::Catalog(2205) {
+                                    if let Cell::Oid(oid) = value {
+                                        match regclass_names.get(&oid) {
+                                            Some(name) => Cell::NamedOid {
+                                                oid,
+                                                name: name.clone(),
+                                            },
+                                            None => Cell::Oid(oid),
+                                        }
+                                    } else {
+                                        value
+                                    }
+                                } else {
+                                    value
+                                })
+                            })
                             .collect::<Result<Vec<_>>>()?,
                     );
                 }
@@ -170,7 +229,8 @@ pub(super) fn run(
         send_chunk(
             tx,
             ResultChunk::Complete(Completion {
-                command: "SELECT".into(),
+                notices: vec![],
+                command: r.command.clone(),
                 affected_rows: Some(total),
                 outcome: ExecutionOutcome::Completed,
             }),
@@ -183,6 +243,58 @@ pub(super) fn run(
         std::thread::sleep(Duration::from_millis(2));
     }
     Ok(())
+}
+fn regclass_names(
+    conn: &Connection,
+    metadata: &MetadataExecution,
+) -> Result<std::collections::BTreeMap<u32, String>> {
+    use fedengine_pg_compat::{display_identifier, scoped_catalog};
+    let sql = format!(
+        "SELECT c.oid,c.relname,n.nspname FROM ({}) c JOIN ({}) n ON n.oid=c.relnamespace",
+        scoped_catalog("pg_class", &metadata.scope)?,
+        scoped_catalog("pg_namespace", &metadata.scope)?
+    );
+    let mut statement = conn.prepare(&sql).map_err(engine_error)?;
+    let entries = statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, u32>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })
+        .map_err(engine_error)?
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(engine_error)?;
+    let mut visible = std::collections::BTreeMap::<&str, (usize, &str)>::new();
+    for (_, name, schema) in &entries {
+        if let Some(rank) = metadata.search_path.iter().position(|s| s == schema) {
+            let first = visible.entry(name).or_insert((rank, schema));
+            if rank < first.0 {
+                *first = (rank, schema);
+            }
+        }
+    }
+    let mut names = entries
+        .iter()
+        .map(|(oid, name, schema)| {
+            let display = if visible
+                .get(name.as_str())
+                .is_some_and(|(_, s)| *s == schema)
+            {
+                display_identifier(name)
+            } else {
+                format!(
+                    "{}.{}",
+                    display_identifier(schema),
+                    display_identifier(name)
+                )
+            };
+            (*oid, display)
+        })
+        .collect::<std::collections::BTreeMap<_, _>>();
+    names.insert(0, "-".into());
+    Ok(names)
 }
 fn send_chunk(
     tx: &mpsc::Sender<ResultChunk>,

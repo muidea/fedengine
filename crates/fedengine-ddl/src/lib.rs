@@ -5,7 +5,7 @@ mod index;
 mod model;
 mod parameters;
 
-pub use analysis::Analyzer;
+pub use analysis::{Analyzer, BindingNamespace};
 pub use index::drop_index_name;
 pub use model::{Analysis, IndexIntent, IndexOwner, Kind, ObjectRef};
-pub use parameters::{cast_parameters, parameter_hints};
+pub use parameters::{cast_parameters, compact_parameters, parameter_hints};

@@ -4,6 +4,7 @@ use fedengine_pg_compat::pg_error;
 use pgwire::{api::results::Tag, error::PgWireResult};
 use std::collections::VecDeque;
 pub(super) struct Cursor {
+    pub(super) notices: Vec<(String, String)>,
     pub(super) columns: Vec<ColumnMeta>,
     pub(super) stream: Option<ExecutionStream>,
     pub(super) pending: VecDeque<Vec<Cell>>,
@@ -24,7 +25,8 @@ impl Cursor {
             let chunk = tokio::select! {biased;_=s.cancel.cancelled()=>return Err(pg_error(if self.kind.writes(){EngineError::new("57014","write canceled").unknown()}else{EngineError::new("57014","query canceled")})),chunk=s.receiver.recv()=>chunk};
             match chunk {
                 Some(ResultChunk::Rows(rows)) => self.pending.extend(rows),
-                Some(ResultChunk::Complete(c)) => {
+                Some(ResultChunk::Complete(mut c)) => {
+                    self.notices.append(&mut c.notices);
                     self.completion = Some(c);
                     self.stream.take();
                     return Ok(None);

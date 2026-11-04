@@ -8,6 +8,7 @@ fn configuration() -> Config {
 }
 fn analyzer() -> Analyzer {
     Analyzer {
+        namespace: None,
         sources: configuration().datasources,
         indexes: vec![],
     }

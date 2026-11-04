@@ -40,8 +40,9 @@ impl SimpleQueryHandler for Backend {
         }
         for sql in statements {
             let mut cursor = self
-                .cursor(client, sql, vec![], vec![], Default::default())
+                .cursor(client, sql, vec![], vec![], Default::default(), None)
                 .await?;
+            self.send_notices(client, &mut cursor).await?;
             if cursor.kind == StatementKind::Query {
                 client
                     .send(PgWireBackendMessage::RowDescription(
@@ -65,6 +66,7 @@ impl SimpleQueryHandler for Backend {
                 )
                 .await?;
             }
+            self.send_notices(client, &mut cursor).await?;
             send(
                 client,
                 PgWireBackendMessage::CommandComplete(cursor.tag().into()),

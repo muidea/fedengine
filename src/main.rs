@@ -28,7 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         return Ok(());
     }
     let engine = FedEngine::start(config).await?;
-    tracing::info!(address=?engine.address(),"FedEngine Ready");
+    tracing::info!(address=?engine.address(),management_address=?engine.management_address(),"FedEngine Ready");
     let run: Result<(), Box<dyn std::error::Error + Send + Sync>> = tokio::select! {result=wait_for_signal()=>result.map_err(Into::into),result=engine.handle.wait()=>result.map_err(Into::into)};
     let shutdown = engine.shutdown_until_drained().await;
     tracing::info!(receipt=?shutdown,"checked shutdown");

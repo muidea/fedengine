@@ -1,6 +1,16 @@
 //! PostgreSQL scalar codecs and scrubbed SQLSTATE responses.
+mod catalog;
+pub use catalog::*;
+mod catalog_codec;
+mod session;
+pub use session::*;
+mod planner;
+pub use planner::*;
+mod execution;
+mod result_types;
 use bytes::{BufMut, BytesMut};
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime, Timelike};
+pub use execution::{EXECUTION_SETTINGS, execution_sql};
 use fedengine_contract::*;
 use fedengine_core::*;
 use pgwire::{
@@ -36,11 +46,12 @@ pub fn fields(columns: &[ColumnMeta], format: &Format) -> Vec<FieldInfo> {
         .map(|(i, c)| {
             FieldInfo::new(
                 c.name.clone(),
-                None,
-                None,
+                c.table_oid.map(|id| id as i32),
+                c.column_attnum,
                 Type::from_oid(c.data_type.oid()).unwrap(),
                 format.format_for(i),
             )
+            .with_type_modifier(c.type_modifier)
         })
         .collect()
 }
@@ -57,7 +68,16 @@ pub fn encode_row(row: &[Cell], columns: &[ColumnMeta], format: &Format) -> Resu
         let value = if format.format_for(i) == FieldFormat::Binary {
             binary(cell, col.data_type)?
         } else {
-            text(cell)?.into_bytes()
+            match catalog_codec::text(cell, col.data_type)? {
+                Some(v) => v.into_bytes(),
+                None => {
+                    let mut value = text(cell)?;
+                    if col.data_type == PgType::Timestamptz {
+                        value.push_str("+00");
+                    }
+                    value.into_bytes()
+                }
+            }
         };
         if value.len() > i32::MAX as usize {
             return Err(EngineError::new(
@@ -74,6 +94,9 @@ fn invalid() -> EngineError {
     EngineError::new("22P02", "invalid parameter representation")
 }
 fn binary(c: &Cell, t: PgType) -> Result<Vec<u8>> {
+    if let PgType::Catalog(oid) = t {
+        return catalog_codec::binary(c, oid);
+    }
     Ok(match (t, c) {
         (PgType::Bool, Cell::Bool(v)) => vec![u8::from(*v)],
         (PgType::Int2, Cell::I16(v)) => v.to_be_bytes().to_vec(),
@@ -107,6 +130,13 @@ fn binary(c: &Cell, t: PgType) -> Result<Vec<u8>> {
 }
 fn text(c: &Cell) -> Result<String> {
     Ok(match c {
+        Cell::Oid(v) => v.to_string(),
+        Cell::NamedOid { name, .. } => name.clone(),
+        Cell::Array { .. } => {
+            return Err(EngineError::unsupported(
+                "array requires its declared catalog type",
+            ));
+        }
         Cell::Null => String::new(),
         Cell::Bool(v) => if *v { "t" } else { "f" }.into(),
         Cell::I16(v) => v.to_string(),
@@ -162,6 +192,9 @@ pub fn decode_parameter(bytes: Option<&[u8]>, t: PgType, binary_format: bool) ->
     if b.len() > 1024 * 1024 {
         return Err(EngineError::new("54000", "parameter exceeds 1 MiB limit"));
     }
+    if let PgType::Catalog(oid) = t {
+        return catalog_codec::decode(b, oid, binary_format);
+    }
     if !binary_format {
         return decode_text(std::str::from_utf8(b).map_err(|_| invalid())?, t);
     }
@@ -171,6 +204,7 @@ pub fn decode_parameter(bytes: Option<&[u8]>, t: PgType, binary_format: bool) ->
         };
     }
     Ok(match t {
+        PgType::Catalog(_) => unreachable!("catalog parameters dispatched above"),
         PgType::Bool => {
             if b.len() != 1 || b[0] > 1 {
                 return Err(invalid());
@@ -214,6 +248,7 @@ fn decode_text(v: &str, t: PgType) -> Result<Cell> {
         };
     }
     Ok(match t {
+        PgType::Catalog(oid) => return catalog_codec::decode(v.as_bytes(), oid, false),
         PgType::Bool => Cell::Bool(match v.to_lowercase().as_str() {
             "t" | "true" | "1" => true,
             "f" | "false" | "0" => false,

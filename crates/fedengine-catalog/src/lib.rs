@@ -4,41 +4,53 @@ use fedengine_core::*;
 use fedengine_datasource::DataSourceRegistry;
 use fedengine_ddl::{IndexOwner, ObjectRef};
 use modorch::{prelude::*, *};
-use std::{
-    collections::BTreeMap,
-    sync::{Arc, atomic::Ordering},
-};
+use std::{collections::BTreeMap, sync::Arc};
 pub const CATALOG_TOPIC: &str = "catalog/control/v1";
 #[derive(Clone)]
 pub enum CatalogRequest {
     Snapshot,
     Indexes(DataSourceId),
+    Headers,
+    Names(String),
+    Directory(DirectoryRequest),
 }
 pub enum CatalogReply {
-    Snapshot(BTreeMap<DataSourceId, u64>),
+    Snapshot(BTreeMap<DataSourceId, SourceVersion>),
     Indexes(Vec<IndexOwner>),
+    Directory(CatalogPage),
+    Headers(CatalogHeads),
+    Names(std::collections::BTreeSet<(String, String)>),
 }
-pub struct CatalogFactory;
+pub struct CatalogFactory {
+    pub managed: bool,
+}
 struct CatalogModule {
     registry: Option<ServiceHandle<DataSourceRegistry>>,
     runtime: Option<ServiceHandle<ExecutionService>>,
+    storage: Option<ServiceHandle<ManagementStorage>>,
+    managed: bool,
 }
-fn descriptor() -> ComponentDescriptor {
+fn descriptor(managed: bool) -> ComponentDescriptor {
     let mut d = ComponentDescriptor::new(ComponentRef::module("catalog-manager"));
     d.requires.extend([
         ComponentRef::initiator("datasource-registry"),
         ComponentRef::initiator("duckdb-runtime"),
     ]);
+    if managed {
+        d.requires.push(ComponentRef::initiator("duckdb-instance"));
+    }
     d
 }
 impl ModuleFactory for CatalogFactory {
     fn descriptor(&self) -> ComponentDescriptor {
-        descriptor()
+        descriptor(self.managed)
     }
     fn create(&self, _: &ComponentConfig) -> FrameworkResult<Box<dyn Module>> {
         Ok(Box::new(CatalogModule {
             registry: None,
             runtime: None,
+            storage: None,
+            managed: self.managed,
         }))
     }
 }
@@ -53,22 +65,29 @@ impl Lifecycle for CatalogModule {
             ctx.services
                 .get(&ComponentRef::initiator("duckdb-runtime"), "execution")?,
         );
+        if self.managed {
+            self.storage = Some(
+                ctx.services
+                    .get(&ComponentRef::initiator("duckdb-instance"), "storage")?,
+            );
+        }
         Ok(())
     }
 }
 impl Module for CatalogModule {
     fn descriptor(&self) -> ComponentDescriptor {
-        descriptor()
+        descriptor(self.managed)
     }
     fn handlers(&mut self) -> FrameworkResult<Option<HandlerRegistration>> {
         Ok(Some(HandlerRegistration::Serial {
             handler: Box::new(CatalogHandler {
                 registry: self.registry.clone().unwrap(),
                 runtime: self.runtime.clone().unwrap(),
+                storage: self.storage.clone(),
             }),
             subscriptions: vec![SubscriptionSpec::new(
                 10,
-                descriptor().component(),
+                descriptor(self.managed).component(),
                 CATALOG_TOPIC,
             )],
         }))
@@ -77,6 +96,7 @@ impl Module for CatalogModule {
 struct CatalogHandler {
     registry: ServiceHandle<DataSourceRegistry>,
     runtime: ServiceHandle<ExecutionService>,
+    storage: Option<ServiceHandle<ManagementStorage>>,
 }
 #[async_trait]
 impl SerialHandler for CatalogHandler {
@@ -91,10 +111,29 @@ impl SerialHandler for CatalogHandler {
                 let r = self.registry.acquire()?;
                 Ok(CatalogReply::Snapshot(
                     r.sources()
-                        .map(|s| (s.definition.id.clone(), s.generation.load(Ordering::SeqCst)))
+                        .map(|s| (s.definition.id.clone(), s.version()))
                         .collect(),
                 ))
             }
+            CatalogRequest::Names(snapshot) => match &self.storage {
+                Some(handle) => handle
+                    .acquire()?
+                    .port
+                    .relation_names(snapshot.clone())
+                    .await
+                    .map(CatalogReply::Names),
+                None => Ok(CatalogReply::Names(Default::default())),
+            },
+            CatalogRequest::Headers => match &self.storage {
+                Some(handle) => handle
+                    .acquire()?
+                    .port
+                    .catalog_headers()
+                    .await
+                    .map(CatalogReply::Headers),
+                None => Ok(CatalogReply::Headers(CatalogHeads::default())),
+            },
+            CatalogRequest::Directory(r) => self.directory(r).await.map(CatalogReply::Directory),
             CatalogRequest::Indexes(id) => {
                 let runtime = self.runtime.acquire()?;
                 runtime
@@ -128,5 +167,26 @@ impl SerialHandler for CatalogHandler {
             }
         };
         Ok(Arc::new(result))
+    }
+}
+
+impl CatalogHandler {
+    async fn directory(&self, request: &DirectoryRequest) -> Result<CatalogPage> {
+        let handle = self
+            .storage
+            .as_ref()
+            .ok_or_else(|| EngineError::unsupported("management is disabled"))?;
+        let storage = handle
+            .acquire()
+            .map_err(|_| EngineError::new("53300", "catalog storage unavailable"))?;
+        let mut page = storage.port.directory(request.clone()).await?;
+        let registry = self
+            .registry
+            .acquire()
+            .map_err(|_| EngineError::new("53300", "catalog registry unavailable"))?;
+        page.stale |= registry
+            .get(&request.id)
+            .is_ok_and(|s| s.stale.load(std::sync::atomic::Ordering::SeqCst));
+        Ok(page)
     }
 }
