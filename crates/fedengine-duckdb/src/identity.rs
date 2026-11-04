@@ -396,10 +396,25 @@ fn identity_epoch(
     .map_err(engine_error)?;
     Ok(epoch)
 }
+#[cfg(test)]
 pub(super) fn prepare(
     conn: &Connection,
     before: &ManagementState,
     after: &mut ManagementState,
+) -> Result<()> {
+    prepare_with_previous(conn, before, after, |snapshot, visit| {
+        for object in &snapshot.objects {
+            visit(object)?;
+        }
+        Ok(())
+    })
+}
+pub(super) type ObjectVisitor<'a> = dyn FnMut(&CatalogObject) -> Result<()> + 'a;
+pub(super) fn prepare_with_previous(
+    conn: &Connection,
+    before: &ManagementState,
+    after: &mut ManagementState,
+    visit: impl Fn(&CatalogSnapshot, &mut ObjectVisitor<'_>) -> Result<()>,
 ) -> Result<()> {
     let epochs = after
         .catalogs
@@ -427,6 +442,7 @@ pub(super) fn prepare(
         .values_mut()
         .filter(|c| c.database_oid == 0 && c.complete)
     {
+        let _memory = crate::memory::Stage::new("identity_assignment");
         let started = std::time::Instant::now();
         let epoch = epochs[&snapshot.id].clone();
         let previous = before
@@ -440,11 +456,6 @@ pub(super) fn prepare(
             .max_by_key(|c| &c.refreshed_at);
         let mut oids = OidBatch::load(conn, &[epoch.clone(), snapshot.incarnation.clone()])?;
         snapshot.database_oid = oids.oid(&snapshot.incarnation, &["database"])?;
-        let previous_objects: HashMap<_, _> = previous
-            .into_iter()
-            .flat_map(|c| &c.objects)
-            .map(|o| (o.metadata.oid, o))
-            .collect();
         for object in &mut snapshot.objects {
             let key = object.metadata.source_id.as_deref().unwrap_or(&object.name);
             object.metadata.oid = if object.metadata.source_id.is_some() {
@@ -452,6 +463,28 @@ pub(super) fn prepare(
             } else {
                 oids.oid(&epoch, &["relation", "name", &object.schema, key])?
             };
+        }
+        let positions: HashMap<_, _> = snapshot
+            .objects
+            .iter()
+            .enumerate()
+            .map(|(i, o)| (o.metadata.oid, i))
+            .collect();
+        let mut previous_ids = Vec::new();
+        if let Some(previous) = previous {
+            visit(previous, &mut |old| {
+                if let Some(&position) = positions.get(&old.metadata.oid) {
+                    retained_categories(old, &mut snapshot.objects[position]);
+                }
+                if snapshot.schemas.contains(&old.schema) {
+                    previous_ids.extend(
+                        std::iter::once(old.metadata.oid)
+                            .chain(old.metadata.constraints.iter().map(|c| c.oid))
+                            .chain(old.metadata.indexes.iter().map(|i| i.oid)),
+                    );
+                }
+                Ok(())
+            })?;
         }
         let mut columns = ColumnBatch::load(conn, snapshot.objects.iter().map(|o| o.metadata.oid))?;
         let mut active = BTreeSet::new();
@@ -462,9 +495,6 @@ pub(super) fn prepare(
         }
         for object in &mut snapshot.objects {
             active.insert(object.metadata.oid);
-            if let Some(old) = previous_objects.get(&object.metadata.oid) {
-                retained_categories(old, object);
-            }
             columns.assign(&mut oids, object)?;
             object.metadata.validate(&object.columns)?;
             for c in &mut object.metadata.constraints {
@@ -489,20 +519,8 @@ pub(super) fn prepare(
             let mut app = conn
                 .appender_to_db("__fed_retired", "main")
                 .map_err(engine_error)?;
-            if let Some(previous) = previous {
-                for old in previous
-                    .objects
-                    .iter()
-                    .filter(|o| snapshot.schemas.contains(&o.schema))
-                {
-                    for id in std::iter::once(old.metadata.oid)
-                        .chain(old.metadata.constraints.iter().map(|c| c.oid))
-                        .chain(old.metadata.indexes.iter().map(|i| i.oid))
-                        .filter(|id| !active.contains(id))
-                    {
-                        app.append_row([id]).map_err(engine_error)?;
-                    }
-                }
+            for id in previous_ids.into_iter().filter(|id| !active.contains(id)) {
+                app.append_row([id]).map_err(engine_error)?;
             }
             app.flush().map_err(engine_error)?;
         }

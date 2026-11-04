@@ -230,7 +230,7 @@ pub(super) fn mutate(
             definitions.push(definition.clone());
         }
         validate_definitions(&definitions, &users)?;
-        let state = crate::storage::read_state(conn)?;
+        let state = crate::storage::read_heads(conn)?;
         if let Some(definition) = &definition {
             for binding in &definition.schemas {
                 let source = state.source(&binding.source)?;
@@ -375,54 +375,20 @@ pub(super) fn publish(conn: &Connection, state: &ManagementState) -> Result<()> 
             let id = format!("virtual:{}:{}", binding.oid, source_snapshot.id);
             let exists:bool=conn.query_row("SELECT count(*)>0 FROM _fedengine.metadata_projection_state WHERE snapshot_id=?",[&id],|r|r.get(0)).map_err(engine_error)?;
             if !exists {
-                let mut snapshot = empty_snapshot(
+                let snapshot = empty_snapshot(
                     id.clone(),
                     &db,
                     [(binding.config.name.clone(), binding.oid)].into(),
                 );
                 let epoch = format!("virtual-schema:{}", binding.oid);
                 let mut oids = identity::OidBatch::load(conn, std::slice::from_ref(&epoch))?;
-                for remote in source_snapshot
-                    .objects
-                    .iter()
-                    .filter(|o| o.schema == binding.config.remote_schema)
-                {
-                    let mut object = remote.clone();
-                    object.schema = binding.config.name.clone();
-                    object.object_type = "FOREIGN TABLE".into();
-                    // These are local foreign bindings. Source physical sizes and
-                    // source scan counters do not describe these virtual relations.
-                    object.metadata.storage = RelationStorage::default();
-                    object.metadata.activity = RelationActivity::default();
-                    object.metadata.oid = oids.oid(
-                        &epoch,
-                        &[
-                            &source_snapshot.incarnation,
-                            &remote.metadata.oid.to_string(),
-                        ],
-                    )?;
-                    object.metadata.constraints.clear();
-                    object.metadata.indexes.clear();
-                    object.metadata.view_definition = None;
-                    object.metadata.view_dependencies = None;
-                    for column in object.metadata.columns.values_mut() {
-                        column.default = None;
-                        column.default_oid = 0;
-                        column.generated = None;
-                        column.identity = None;
-                    }
-                    snapshot.objects.push(object);
+                projection::ForeignProjection {
+                    snapshot: &snapshot,
+                    source: source_snapshot,
+                    alias: &db.config.name,
+                    binding,
                 }
-                projection::publish(conn, &snapshot, &db.config.name)?;
-                let epoch = format!("virtual-schema:{}", binding.oid);
-                projection::foreign_binding(
-                    conn,
-                    &snapshot,
-                    &db.config.name,
-                    &binding.config.name,
-                    oids.oid(&epoch, &["wrapper"])?,
-                    oids.oid(&epoch, &["server"])?,
-                )?;
+                .publish(conn, &mut oids)?;
                 oids.flush()?;
             }
             keep.insert(id.clone());
@@ -536,10 +502,16 @@ mod tests {
         // Restart/config reconciliation and unchanged refresh retain the logical identities.
         crate::storage::initialize(&conn, &config).unwrap();
         assert_eq!(read(&conn).unwrap()[0], db);
+        // A fresh capture supplies its objects explicitly; control transactions
+        // deliberately expose headers rather than loading historical payloads.
+        let mut next = crate::storage::read_state(&conn)
+            .unwrap()
+            .catalogs
+            .remove("original")
+            .unwrap();
         crate::storage::transaction(
             &conn,
-            Box::new(|state| {
-                let mut next = state.catalogs["original"].clone();
+            Box::new(move |state| {
                 next.id = "refreshed".into();
                 next.refreshed_at = "later".into();
                 // A changed comment prevents the unchanged-fact optimization.

@@ -117,6 +117,7 @@ fn capture_once(
             "selected schema does not exist in the target database",
         ));
     }
+    let _memory = crate::memory::Stage::new("remote_capture");
     let mut objects = read_core(conn, &source, budget)?;
     tracing::debug!(source=%source.id.0, objects=objects.len(), elapsed_ms=started.elapsed().as_secs_f64()*1000., "catalog core enumeration finished");
     enforce_budget(&objects.values().collect::<Vec<_>>(), budget)?;
@@ -169,19 +170,7 @@ fn capture_once(
         ));
     }
     let objects: Vec<_> = objects.into_values().collect();
-    let core: Vec<_> = objects
-        .iter()
-        .map(|o| {
-            (
-                &o.schema,
-                &o.name,
-                &o.object_type,
-                &o.metadata.source_id,
-                &o.columns,
-            )
-        })
-        .collect();
-    let structure_digest = fact_digest(&(&source.allowed_schemas, core));
+    let structure_digest = structure_digest(&source.allowed_schemas, &objects);
     tracing::debug!(source=%source.id.0, objects=objects.len(), elapsed_ms=started.elapsed().as_secs_f64()*1000., "catalog remote capture finished");
     Ok(CatalogSnapshot {
         database_oid: 0,
@@ -197,6 +186,52 @@ fn capture_once(
         schemas: source.allowed_schemas,
         objects,
     })
+}
+fn structure_digest(schemas: &[String], objects: &[CatalogObject]) -> String {
+    // Hash one object's definition at a time. Scanner bindings depend on
+    // defaults/constraints/indexes too; changing only statistics must not evict
+    // every attached source's cache. Computed before local identity allocation;
+    // omit scan timestamps and physical statistics.
+    let definitions: Vec<_> = objects
+        .iter()
+        .map(|o| {
+            let indexes: Vec<_> = o
+                .metadata
+                .indexes
+                .iter()
+                .map(|i| {
+                    (
+                        &i.source_id,
+                        &i.name,
+                        &i.method,
+                        i.unique,
+                        i.primary,
+                        i.valid,
+                        i.enabled,
+                        i.nulls_not_distinct,
+                        &i.keys,
+                        &i.include,
+                        &i.predicate,
+                        &i.definition,
+                    )
+                })
+                .collect();
+            fact_digest(&(
+                &o.schema,
+                &o.name,
+                &o.object_type,
+                &o.metadata.source_id,
+                &o.columns,
+                &o.metadata.columns,
+                &o.metadata.dropped_attnums,
+                &o.metadata.constraints,
+                indexes,
+                &o.metadata.view_definition,
+                &o.metadata.view_dependencies,
+            ))
+        })
+        .collect();
+    fact_digest(&(schemas, definitions))
 }
 type CoreObjects = BTreeMap<(String, String), CatalogObject>;
 fn core_identity(objects: &CoreObjects) -> String {
@@ -320,5 +355,54 @@ fn scoped_query(source: &DataSourceDefinition, query: &str) -> String {
         )
     } else {
         query.into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn definition_digest_tracks_binding_changes_but_not_statistics() {
+        let page: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/metadata/published-pg16-directory.json"
+        ))
+        .unwrap();
+        let objects: Vec<CatalogObject> = serde_json::from_value(page["objects"].clone()).unwrap();
+        let schemas = vec!["sales".into()];
+        let expected = structure_digest(&schemas, &objects);
+        let mut stats = objects.clone();
+        for object in &mut stats {
+            object.metadata.storage.main_bytes = Some(12345);
+            object.metadata.activity.seq_scan = Some(999);
+            object.metadata.statistics.pages = Some(100);
+            object
+                .metadata
+                .status
+                .insert("statistics".into(), MetadataStatus::success());
+            for index in &mut object.metadata.indexes {
+                index.storage.main_bytes = Some(54321);
+                index.activity.idx_scan = Some(88);
+            }
+        }
+        assert_eq!(structure_digest(&schemas, &stats), expected);
+        let mut defaults = objects.clone();
+        defaults[0]
+            .metadata
+            .columns
+            .values_mut()
+            .next()
+            .unwrap()
+            .default = MetadataExpression::source("42".into(), DataSourceKind::Postgres);
+        assert_ne!(structure_digest(&schemas, &defaults), expected);
+        let mut constraints = objects.clone();
+        constraints[0].metadata.constraints.clear();
+        assert_ne!(structure_digest(&schemas, &constraints), expected);
+        let mut indexes = objects.clone();
+        indexes[0].metadata.indexes[0].valid = Some(false);
+        assert_ne!(structure_digest(&schemas, &indexes), expected);
+        let mut views = objects;
+        views[0].metadata.view_definition =
+            MetadataExpression::source("SELECT 2".into(), DataSourceKind::Postgres);
+        assert_ne!(structure_digest(&schemas, &views), expected);
     }
 }

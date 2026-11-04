@@ -165,7 +165,7 @@ pub(super) fn recover(
     config: &Config,
     registry: &DataSourceRegistry,
 ) -> Result<()> {
-    let state = storage::read_state(conn)?;
+    let state = storage::read_heads(conn)?;
     for source in state.sources.values().filter(|s| !s.deleted) {
         if !source.desired_enabled {
             if source.status != SourceStatus::Registered {
@@ -345,7 +345,7 @@ pub(super) fn initialize_static(
     config: &Config,
     registry: &DataSourceRegistry,
 ) -> Result<()> {
-    let state = storage::read_state(conn)?;
+    let state = storage::read_heads(conn)?;
     let mut publications = Vec::new();
     for definition in &config.datasources {
         let existing = state

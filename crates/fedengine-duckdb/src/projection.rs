@@ -6,6 +6,9 @@ use fedengine_pg_compat::{builtin_types, catalog_schema, physical_catalog};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
+mod foreign;
+pub(super) use foreign::ForeignProjection;
+
 struct Row {
     snapshot: String,
     catalog: String,
@@ -15,7 +18,41 @@ struct Row {
     target_object: Option<String>,
     value: Value,
 }
-type Rows = BTreeMap<String, Vec<Row>>;
+#[derive(Default)]
+struct Rows {
+    rows: BTreeMap<String, Vec<Row>>,
+    bytes: usize,
+}
+impl std::ops::Deref for Rows {
+    type Target = BTreeMap<String, Vec<Row>>;
+    fn deref(&self) -> &Self::Target {
+        &self.rows
+    }
+}
+impl std::ops::DerefMut for Rows {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.rows
+    }
+}
+impl Rows {
+    fn new() -> Self {
+        Self::default()
+    }
+    fn full(&self) -> bool {
+        // Soft batch thresholds: a single value/column/constraint group can
+        // exceed the byte estimate. The operation budget bounds source facts.
+        self.bytes >= 2 * 1024 * 1024 || self.rows.values().map(Vec::len).sum::<usize>() >= 4096
+    }
+}
+fn value_bytes(value: &Value) -> usize {
+    std::mem::size_of::<Value>()
+        + match value {
+            Value::String(s) => s.len(),
+            Value::Array(a) => a.iter().map(value_bytes).sum(),
+            Value::Object(o) => o.iter().map(|(k, v)| k.len() + value_bytes(v)).sum(),
+            _ => 0,
+        }
+}
 fn push(
     rows: &mut Rows,
     relation: &str,
@@ -25,6 +62,12 @@ fn push(
     object: &str,
     value: Value,
 ) {
+    rows.bytes += snapshot.len()
+        + catalog.len()
+        + schema.len()
+        + object.len()
+        + std::mem::size_of::<Row>()
+        + value_bytes(&value);
     rows.entry(relation.into()).or_default().push(Row {
         snapshot: snapshot.into(),
         catalog: catalog.into(),
@@ -35,63 +78,87 @@ fn push(
         value,
     });
 }
+fn native_value(value: &Value, target: &str) -> Result<duckdb::types::Value> {
+    use duckdb::types::Value as V;
+    let invalid = || EngineError::new("XX000", "invalid typed catalog projection");
+    if value.is_null() {
+        return Ok(V::Null);
+    }
+    if let Some(base) = target.strip_suffix("[]") {
+        return Ok(V::List(
+            value
+                .as_array()
+                .ok_or_else(invalid)?
+                .iter()
+                .map(|v| native_value(v, base))
+                .collect::<Result<Vec<_>>>()?,
+        ));
+    }
+    Ok(match target {
+        "BOOLEAN" => V::Boolean(value.as_bool().ok_or_else(invalid)?),
+        "SMALLINT" => V::SmallInt(
+            value
+                .as_i64()
+                .and_then(|n| n.try_into().ok())
+                .ok_or_else(invalid)?,
+        ),
+        "INTEGER" => V::Int(
+            value
+                .as_i64()
+                .and_then(|n| n.try_into().ok())
+                .ok_or_else(invalid)?,
+        ),
+        "BIGINT" => V::BigInt(value.as_i64().ok_or_else(invalid)?),
+        "UINTEGER" => V::UInt(
+            value
+                .as_u64()
+                .and_then(|n| n.try_into().ok())
+                .ok_or_else(invalid)?,
+        ),
+        "FLOAT" => V::Float(value.as_f64().ok_or_else(invalid)? as f32),
+        "DOUBLE" => V::Double(value.as_f64().ok_or_else(invalid)?),
+        _ => V::Text(
+            value
+                .as_str()
+                .map(str::to_owned)
+                .unwrap_or_else(|| value.to_string()),
+        ),
+    })
+}
 fn insert(conn: &Connection, rows: Rows) -> Result<()> {
-    // Append text facts in vectors, then cast each catalog in a single statement.
-    // Keep this inside the caller's publication transaction: a failed cast cannot
-    // expose a partial snapshot, and JSON arrays retain their element types.
-    for (relation, rows) in rows {
+    // Append directly to typed catalogs. No VARCHAR staging table, JSON arrays
+    // or INSERT SELECT copy coexist with the final transaction's native buffers.
+    for (relation, rows) in rows.rows {
         let fields = &catalog_schema()[&relation];
-        let names = fields
-            .iter()
-            .map(|f| quote_identifier(&f.attname))
-            .collect::<Vec<_>>();
-        let definitions = names
-            .iter()
-            .map(|n| format!("{n} VARCHAR"))
-            .collect::<Vec<_>>()
-            .join(",");
-        conn.execute_batch(&format!("CREATE OR REPLACE TEMP TABLE __fed_projection_stage (_snapshot_id VARCHAR,_catalog VARCHAR,_schema VARCHAR,_object VARCHAR,_target_schema VARCHAR,_target_object VARCHAR,{definitions})")).map_err(engine_error)?;
-        {
-            let mut appender = conn
-                .appender_to_db("__fed_projection_stage", "main")
-                .map_err(engine_error)?;
-            for row in rows {
-                let mut values = vec![
-                    Some(row.snapshot),
-                    Some(row.catalog),
-                    Some(row.schema),
-                    Some(row.object),
-                    row.target_schema,
-                    row.target_object,
-                ];
-                values.extend(fields.iter().map(|f| match &row.value[&f.attname] {
-                    Value::Null => None,
-                    Value::String(s) => Some(s.clone()),
-                    v => Some(v.to_string()),
-                }));
-                appender
-                    .append_row(appender_params_from_iter(values))
-                    .map_err(engine_error)?;
+        let physical = physical_catalog(&relation)?;
+        let table = physical
+            .strip_prefix("_fedengine.")
+            .expect("controlled catalog")
+            .trim_matches('"');
+        let mut appender = conn
+            .appender_to_db(table, "_fedengine")
+            .map_err(engine_error)?;
+        for row in rows {
+            use duckdb::types::Value as V;
+            let mut values = vec![
+                V::Text(row.snapshot),
+                V::Text(row.catalog),
+                V::Text(row.schema),
+                V::Text(row.object),
+                row.target_schema.map(V::Text).unwrap_or(V::Null),
+                row.target_object.map(V::Text).unwrap_or(V::Null),
+            ];
+            for field in fields {
+                values.push(native_value(
+                    &row.value[&field.attname],
+                    field.duckdb_type(),
+                )?);
             }
-            appender.flush().map_err(engine_error)?;
+            appender
+                .append_row(appender_params_from_iter(values))
+                .map_err(engine_error)?;
         }
-        let casts = fields
-            .iter()
-            .zip(&names)
-            .map(|(f, n)| {
-                let t = f.duckdb_type();
-                if let Some(base) = t.strip_suffix("[]") {
-                    format!(
-                        "from_json({n}, {})",
-                        quote_literal(&format!("[\"{base}\"]"))
-                    )
-                } else {
-                    format!("CAST({n} AS {t})")
-                }
-            })
-            .collect::<Vec<_>>()
-            .join(",");
-        conn.execute_batch(&format!("INSERT INTO {} SELECT _snapshot_id,_catalog,_schema,_object,_target_schema,_target_object,{casts} FROM __fed_projection_stage; DROP TABLE __fed_projection_stage", physical_catalog(&relation)?)).map_err(engine_error)?;
+        appender.flush().map_err(engine_error)?;
     }
     Ok(())
 }
@@ -241,6 +308,7 @@ fn attnums(object: &CatalogObject, names: &[String]) -> Option<Vec<i16>> {
         .collect()
 }
 pub(super) fn publish(conn: &Connection, snapshot: &CatalogSnapshot, alias: &str) -> Result<()> {
+    let _memory = crate::memory::Stage::new("source_projection");
     let started = std::time::Instant::now();
     let id = &snapshot.id;
     let exists: i64 = conn
@@ -491,6 +559,9 @@ pub(super) fn publish(conn: &Connection, snapshot: &CatalogSnapshot, alias: &str
                     json!({"oid":props.default_oid,"adrelid":oid,"adnum":props.attnum,"adbin":default}),
                 );
             }
+            if rows.full() {
+                insert(conn, std::mem::take(&mut rows))?;
+            }
         }
         for num in &object.metadata.dropped_attnums {
             push(
@@ -502,6 +573,9 @@ pub(super) fn publish(conn: &Connection, snapshot: &CatalogSnapshot, alias: &str
                 name,
                 json!({"attrelid":oid,"attname":format!("........pg.dropped.{num}........"),"atttypid":0,"attnum":num,"atttypmod":-1,"attnotnull":false,"attisdropped":true,"attidentity":"","attgenerated":"","atthasdef":false}),
             );
+            if rows.full() {
+                insert(conn, std::mem::take(&mut rows))?;
+            }
         }
         if matches!(kind, "r" | "m" | "p") {
             let mut activity = serde_json::to_value(&object.metadata.activity)
@@ -525,6 +599,9 @@ pub(super) fn publish(conn: &Connection, snapshot: &CatalogSnapshot, alias: &str
                 value["attname"] = json!(column);
                 value["inherited"] = json!(false);
                 push(&mut rows, "pg_stats", id, alias, schema, name, value);
+                if rows.full() {
+                    insert(conn, std::mem::take(&mut rows))?;
+                }
             }
         }
         for index in &object.metadata.indexes {
@@ -596,6 +673,9 @@ pub(super) fn publish(conn: &Connection, snapshot: &CatalogSnapshot, alias: &str
                     name,
                     json!({"attrelid":index.oid,"attname":key.map(String::as_str).unwrap_or("expression"),"atttypid":column.map(|c|c.type_oid).unwrap_or(0),"attnum":position+1,"atttypmod":column.map(|c|c.type_modifier).unwrap_or(-1),"attnotnull":false,"attisdropped":false,"attidentity":"","attgenerated":"","atthasdef":false,"attislocal":true,"attinhcount":0}),
                 );
+                if rows.full() {
+                    insert(conn, std::mem::take(&mut rows))?;
+                }
             }
             let text = pg_text(index.definition.as_ref());
             push(
@@ -760,7 +840,7 @@ pub(super) fn publish(conn: &Connection, snapshot: &CatalogSnapshot, alias: &str
             }
             // Every dependent standard row uses the same target visibility restriction.
             if let Some(f) = fk {
-                for (relation, items) in &mut rows {
+                for (relation, items) in &mut rows.rows {
                     if relation.starts_with("information_schema.") {
                         for row in items
                             .iter_mut()
@@ -775,9 +855,13 @@ pub(super) fn publish(conn: &Connection, snapshot: &CatalogSnapshot, alias: &str
                     }
                 }
             }
+            // Flush only after the whole constraint has its target visibility.
+            if rows.full() {
+                insert(conn, std::mem::take(&mut rows))?;
+            }
         }
         // Flush complete object groups so FK visibility annotations remain atomic.
-        if rows.values().map(Vec::len).sum::<usize>() >= 4096 {
+        if rows.full() {
             insert(conn, std::mem::take(&mut rows))?;
         }
     }
@@ -885,6 +969,60 @@ mod tests {
     use duckdb::{params_from_iter, types::Value as DuckValue};
     use fedengine_contract::*;
     use fedengine_pg_compat::{CompatibilityPlan, plan_compatibility};
+    #[test]
+    fn typed_append_preserves_unsigned_oids_empty_arrays_and_null_elements() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE SCHEMA _fedengine").unwrap();
+        initialize(&conn).unwrap();
+        let mut rows = Rows::new();
+        push(
+            &mut rows,
+            "pg_index",
+            "typed",
+            "test",
+            "public",
+            "t",
+            json!({"indexrelid":u32::MAX,"indkey":[1,null,0],"indoption":[]}),
+        );
+        push(
+            &mut rows,
+            "pg_proc",
+            "typed",
+            "test",
+            "public",
+            "f",
+            json!({"oid":u32::MAX,"proargtypes":[u32::MAX,null],"proallargtypes":null,"proargnames":["quoted \" name",null]}),
+        );
+        push(
+            &mut rows,
+            "pg_stat_all_tables",
+            "typed",
+            "test",
+            "public",
+            "t",
+            json!({"relid":u32::MAX,"last_analyze":"2026-11-04T01:02:03+00:00"}),
+        );
+        insert(&conn, rows).unwrap();
+        let (oid,keys,options): (u32,String,String) = conn.query_row("SELECT indexrelid,to_json(indkey),to_json(indoption) FROM _fedengine.meta_pg_index WHERE _snapshot_id='typed'", [], |r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).unwrap();
+        assert_eq!(oid, u32::MAX);
+        assert_eq!(
+            serde_json::from_str::<Value>(&keys).unwrap(),
+            json!([1, null, 0])
+        );
+        assert_eq!(options, "[]");
+        let (args,all_args,names): (String,Option<String>,String) = conn.query_row("SELECT to_json(proargtypes),to_json(proallargtypes),to_json(proargnames) FROM _fedengine.meta_pg_proc WHERE _snapshot_id='typed'", [], |r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&args).unwrap(),
+            json!([u32::MAX, null])
+        );
+        assert_eq!(all_args, None);
+        assert_eq!(
+            serde_json::from_str::<Value>(&names).unwrap(),
+            json!(["quoted \" name", null])
+        );
+        let timestamp: bool = conn.query_row("SELECT last_analyze=TIMESTAMPTZ '2026-11-04T01:02:03+00:00' FROM _fedengine.meta_pg_stat_all_tables WHERE _snapshot_id='typed'",[],|r|r.get(0)).unwrap();
+        assert!(timestamp);
+    }
     #[test]
     fn current_builtin_projection_is_idempotent_and_preserves_business_identity() {
         let conn = Connection::open_in_memory().unwrap();
@@ -1382,6 +1520,7 @@ mod tests {
             schemas: vec!["sales".into()],
             objects,
         };
+        let _memory = crate::memory::Stage::new("source_projection");
         let started = std::time::Instant::now();
         publish(&conn, &snapshot, "scale").unwrap();
         conn.execute_batch("COMMIT").unwrap();

@@ -140,3 +140,20 @@ FEDENGINE_SCALE_OBJECTS=10000 FEDENGINE_SCALE_COLUMNS=10 FEDENGINE_SCALE_ROUNDS=
 ```
 
 输入限制为最多 10k 表/100k 列；正式实例使用 256MB DuckDB memory_limit，一列表场景操作额度为 256MiB，多列表场景在运行前固定为 512MiB（共享额度 512MiB，因此仅一项采集可运行）；独立采集实例的 DuckDB 内存上限为 128MiB。默认 RSS 上限为 1024MiB，可通过 `FEDENGINE_SCALE_RSS_MB` 显式调整，不能在失败后悄悄改变验收预算。用例断言查询无错误、最大停顿不超过 1 秒、p99 相比空载基线增加不超过 100ms、最后三轮 RSS 波动不超过 64MiB，并检查进程峰值预算。它使用闭环查询加 20ms 间隔，不代表开放环吞吐量或生产容量认证。正式屏障及各阶段耗时从 debug 日志单独核对；Apply 的正式挂载窗口与普通刷新分别评估。临时日志验证后清理，不归档。
+
+### 实际 release 进程规模回归
+
+`metadata-scale.py` 启动真实 release 二进制，使用独立端口、状态库和临时日志；只允许显式确认的一次性 PostgreSQL。需要 Python 的 psycopg2，源容器的 `max_locks_per_transaction=512`，源 DSN 从环境变量读取，日志及输出不打印凭据。夹具 schema、状态及日志在退出时删除，输出只写 stdout，不归档。
+
+```sh
+cargo build --release --locked
+export FEDENGINE_POSTGRES_DSN='一次性 PostgreSQL 的 DSN'
+python3 scripts/metadata-scale.py --disposable-source \
+  --binary target/release/fedengine \
+  --library-dir target/duckdb-download/x86_64-unknown-linux-gnu/v2.0.0 \
+  --objects 10000 --columns 10 --rounds 10 --repetitions 3
+```
+
+默认使用 256MB 正式 DuckDB、512MiB 元数据共享额度/单操作额度、128MB 独立采集实例、1024MiB 进程 RSS 上限；一列场景指定 `--columns 1 --operation-mib 256`。每次重复创建独立进程，包含首次 Apply 和十轮 Refresh。核对阶段耗时、内核 VmHWM、查询 p99/最大停顿、末三轮 RSS 平台、对象身份及投影列数，检查查询和操作无错误及正常退出。轮末平台采样等待后台 checkpoint 收尾，峰值保留全程采样；状态成功不等同于资源已归还。预算不因失败上调；工程优化目标为 RSS 800MiB、最大停顿 500ms，外部验收仍为 RSS 1024MiB、停顿 1s、p99 基线+100ms、末三轮波动64MiB。
+
+多源场景可设置 `--sources 2 --objects 5000 --columns 10 --operation-mib 256`，保持远端总量为100k列并并发刷新；`--mappings 2` 验证同一来源的多份逻辑映射。若映射倍增或混合业务需独立容量预算，必须在运行前显式设置并单独报告，不能与默认单映射验收混为一组。查询为闭环并在每轮间隔20ms，不代表开放环吞吐量或24小时耐久。实际部署额度的候选配置与边界见管理 API。

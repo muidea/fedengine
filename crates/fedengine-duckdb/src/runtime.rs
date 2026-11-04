@@ -258,6 +258,7 @@ impl DuckdbRuntime {
                     if cancel.is_cancelled() {
                         return Err(EngineError::new("57014", "metadata capture canceled"));
                     }
+                    let _memory = crate::memory::Stage::new("isolated_collector");
                     let conn =
                         crate::instance::initialize_local(&config).map_err(framework_error)?;
                     *handle.lock().unwrap() = Some(conn.interrupt_handle());

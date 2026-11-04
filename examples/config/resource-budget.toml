@@ -1,0 +1,61 @@
+# Candidate for a 2GiB local/container allocation, not a capacity guarantee.
+# DuckDB, isolated collectors, Rust facts, result buffers and thread/native
+# overhead share that allocation. Set the external service/container limit
+# separately and validate its memory.current, including charged file cache.
+# This profile does not change the 1GiB RSS metadata regression threshold.
+# Default local development profile, without remote data sources.
+# Production must configure TLS certificate/key and tls_required=true.
+[application]
+name = "fedengine"
+[pgwire]
+# Clients connect to an active catalog_alias or an explicitly configured virtual database.
+listen = "127.0.0.1:15432"
+max_connections = 256
+startup_timeout_ms = 10000
+query_timeout_ms = 60000
+output_timeout_ms = 10000
+tls_required = false
+max_statements = 128
+max_portals = 64
+allow_cross_database = false
+[duckdb]
+database_path = "./data/fedengine.duckdb"
+max_workers = 4
+threads = 2
+memory_limit = "512MB"
+temp_directory = "./data/tmp"
+result_channel_batches = 8
+batch_rows = 512
+acquire_timeout_ms = 5000
+install_extensions = false
+pool_max_connections = 16
+pool_wait_timeout_ms = 30000
+# Source definitions below are imported only into a new management database.
+[management]
+# preserve keeps normal disable/resume identities. strict rotates MySQL object
+# identities after restart, disabled intervals and observed metadata failures.
+mysql_identity_policy = "preserve"
+enabled = true
+listen = "127.0.0.1:15433"
+credentials_directory = "./secrets"
+queue_capacity = 64
+max_concurrent_operations = 2
+# Reserve before collection; the isolated DuckDB limit is half, capped at 128MiB.
+metadata_memory_budget_mb = 512
+metadata_operation_memory_mb = 256
+drain_timeout_ms = 30000
+request_timeout_ms = 10000
+[ddl]
+enabled = true
+allow_drop_schema = false
+source_lock_timeout_ms = 30000
+[shutdown]
+grace_period_secs = 30
+[[users]]
+name = "fedengine"
+password_secret_ref = "FEDENGINE_PASSWORD"
+# Datasources and capability records are optional; see examples/config/federation.toml.
+
+[[virtual_databases]]
+name = "fedengine"
+owner = "fedengine"

@@ -284,9 +284,28 @@ impl Coordinator {
         if shutdown.is_cancelled() {
             return Ok(());
         }
+        let previous_catalog = source
+            .catalog_snapshot
+            .as_ref()
+            .and_then(|id| state.catalogs.get(id));
+        let changed = outcome.catalog.as_ref().is_some_and(|c| {
+            previous_catalog.is_none_or(|old| old.structure_digest != c.structure_digest)
+        });
+        let retain_cache = is_refresh
+            && source.status == SourceStatus::Active
+            && registry
+                .get(&source.id)
+                .is_ok_and(|s| !s.stale.load(std::sync::atomic::Ordering::SeqCst))
+            && outcome
+                .catalog
+                .as_ref()
+                .is_some_and(|next| scanner_cache_reusable(source.kind, previous_catalog, next));
         // Source drain is independent of remote collection. The instance barrier is only
         // held for the live ATTACH/DETACH/cache mutation, never for the catalog scan.
-        if changing && (outcome.error.is_none() || (is_apply && !outcome.restored_previous)) {
+        if changing
+            && !retain_cache
+            && (outcome.error.is_none() || (is_apply && !outcome.restored_previous))
+        {
             self.phase(
                 id,
                 "WaitingForLiveMutation",
@@ -348,13 +367,6 @@ impl Coordinator {
             .map(|v| v.generation)
             .unwrap_or(source.generation)
             .max(source.generation);
-        let changed = outcome.catalog.as_ref().is_some_and(|c| {
-            source
-                .catalog_snapshot
-                .as_ref()
-                .and_then(|id| state.catalogs.get(id))
-                .is_none_or(|old| old.structure_digest != c.structure_digest)
-        });
         let generation = generation_before
             + u64::from(
                 is_apply
@@ -659,6 +671,29 @@ fn stage_catalog(catalog: &CatalogSnapshot, cancel: CancellationToken) -> Result
 
 /// Do not queue a write waiter on Tokio's fair RwLock: a suspended portal must
 /// not turn one pending publication into a global query admission outage.
+fn scanner_cache_reusable(
+    kind: DataSourceKind,
+    previous: Option<&CatalogSnapshot>,
+    next: &CatalogSnapshot,
+) -> bool {
+    // MySQL lacks reliable table identities across offline same-name rebuilds.
+    // A digest match alone must not preserve its scanner's old table binding.
+    kind == DataSourceKind::Postgres
+        && previous.is_some_and(|old| {
+            old.complete && !old.stale && old.structure_digest == next.structure_digest
+        })
+        && next.complete
+        && !next.stale
+        && next.objects.iter().all(|o| {
+            ["details", "column_properties", "constraints", "indexes"]
+                .iter()
+                .all(|category| {
+                    o.metadata.status.get(*category).is_some_and(|s| {
+                        s.complete && !s.stale && s.scan_state == MetadataScanState::Success
+                    })
+                })
+        })
+}
 async fn acquire_barrier(
     registry: &DataSourceRegistry,
     shutdown: &CancellationToken,
@@ -680,6 +715,87 @@ async fn acquire_barrier(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn only_complete_unchanged_postgres_definitions_keep_scanner_cache() {
+        let mut next = CatalogSnapshot {
+            id: "next".into(),
+            incarnation: "source".into(),
+            revision: 1,
+            generation: 1,
+            database_oid: 0,
+            schema_oids: Default::default(),
+            refreshed_at: "now".into(),
+            complete: true,
+            stale: false,
+            structure_digest: "same".into(),
+            schemas: vec!["public".into()],
+            objects: vec![CatalogObject {
+                schema: "public".into(),
+                name: "t".into(),
+                object_type: "TABLE".into(),
+                columns: vec![],
+                indexes: vec![],
+                metadata: Default::default(),
+            }],
+        };
+        for category in ["details", "column_properties", "constraints", "indexes"] {
+            next.objects[0]
+                .metadata
+                .status
+                .insert(category.into(), MetadataStatus::success());
+        }
+        let previous = next.header();
+        assert!(scanner_cache_reusable(
+            DataSourceKind::Postgres,
+            Some(&previous),
+            &next
+        ));
+        assert!(!scanner_cache_reusable(
+            DataSourceKind::Mysql,
+            Some(&previous),
+            &next
+        ));
+        assert!(!scanner_cache_reusable(
+            DataSourceKind::Postgres,
+            None,
+            &next
+        ));
+        next.structure_digest = "changed default".into();
+        assert!(!scanner_cache_reusable(
+            DataSourceKind::Postgres,
+            Some(&previous),
+            &next
+        ));
+        next.structure_digest = previous.structure_digest.clone();
+        next.stale = true;
+        assert!(!scanner_cache_reusable(
+            DataSourceKind::Postgres,
+            Some(&previous),
+            &next
+        ));
+        next.stale = false;
+        for category in ["details", "column_properties", "constraints", "indexes"] {
+            let saved = next.objects[0].metadata.status.remove(category).unwrap();
+            assert!(!scanner_cache_reusable(
+                DataSourceKind::Postgres,
+                Some(&previous),
+                &next
+            ));
+            next.objects[0].metadata.status.insert(
+                category.into(),
+                MetadataStatus::failure(&EngineError::new("42501", "denied")),
+            );
+            assert!(!scanner_cache_reusable(
+                DataSourceKind::Postgres,
+                Some(&previous),
+                &next
+            ));
+            next.objects[0]
+                .metadata
+                .status
+                .insert(category.into(), saved);
+        }
+    }
     #[tokio::test]
     async fn waiting_publication_does_not_queue_a_writer_ahead_of_new_queries() {
         let registry = Arc::new(DataSourceRegistry::new(&[]));

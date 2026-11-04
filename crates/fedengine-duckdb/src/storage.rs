@@ -456,7 +456,7 @@ fn read_map<T: DeserializeOwned>(conn: &Connection, table: &str) -> Result<BTree
     }
     Ok(values)
 }
-fn read_heads(conn: &Connection) -> Result<ManagementState> {
+pub(super) fn read_heads(conn: &Connection) -> Result<ManagementState> {
     Ok(ManagementState {
         sources: read_map(conn, "data_sources")?,
         revisions: read_map(conn, "source_revisions")?,
@@ -464,18 +464,25 @@ fn read_heads(conn: &Connection) -> Result<ManagementState> {
         catalogs: read_map(conn, "catalog_snapshots")?,
     })
 }
-fn load_objects(conn: &Connection, state: &mut ManagementState, id: &str) -> Result<()> {
-    let snapshot = state.catalogs.get_mut(id).ok_or_else(storage_error)?;
+fn visit_objects(
+    conn: &Connection,
+    snapshot: &CatalogSnapshot,
+    visit: &mut crate::identity::ObjectVisitor<'_>,
+) -> Result<()> {
+    if !snapshot.objects.is_empty() {
+        for object in &snapshot.objects {
+            visit(object)?;
+        }
+        return Ok(());
+    }
     let mut stmt = conn
-        .prepare(
-            "SELECT payload FROM _fedengine.catalog_objects WHERE starts_with(key,?) ORDER BY key",
-        )
+        .prepare("SELECT payload FROM _fedengine.catalog_objects WHERE snapshot_id=? ORDER BY key")
         .map_err(engine_error)?;
-    let mut rows = stmt.query([format!("{id}:")]).map_err(engine_error)?;
+    let mut rows = stmt.query([&snapshot.id]).map_err(engine_error)?;
     while let Some(row) = rows.next().map_err(engine_error)? {
         let payload: Vec<u8> = row.get(0).map_err(engine_error)?;
         let (_, object) = decode_object(&payload)?;
-        snapshot.objects.push(object);
+        visit(&object)?;
     }
     Ok(())
 }
@@ -534,24 +541,15 @@ fn metadata_transaction(conn: &Connection, update: ManagementUpdate) -> Result<M
     }
     result
 }
-fn prepare_changes(conn: &Connection, incarnation: &str, update: ManagementUpdate) -> Result<()> {
-    let mut before = read_heads(conn)?;
+fn prepare_changes(conn: &Connection, _incarnation: &str, update: ManagementUpdate) -> Result<()> {
+    let _memory = crate::memory::Stage::new("local_preparation");
+    let before = read_heads(conn)?;
     let mut after = before.clone();
     update(&mut after)?;
-    // Failure/status-only publications do not need relation payloads either.
-    if after
-        .catalogs
-        .values()
-        .any(|c| c.database_oid == 0 && c.complete)
-        && let Some(id) = before
-            .sources
-            .get(incarnation)
-            .and_then(|s| s.catalog_snapshot.clone())
-    {
-        load_objects(conn, &mut before, &id)?;
-    }
-    crate::identity::prepare(conn, &before, &mut after)?;
-    reuse_unchanged_snapshots(&before, &mut after);
+    crate::identity::prepare_with_previous(conn, &before, &mut after, |snapshot, visit| {
+        visit_objects(conn, snapshot, visit)
+    })?;
+    reuse_unchanged_snapshots(conn, &before, &mut after)?;
     after.prune_catalogs(3);
     write_changes(conn, &before, &after)?;
     Ok(())
@@ -579,6 +577,7 @@ impl PreparedPublication for PendingPublication {
                 let _ownership = ownership;
                 let pending = self;
                 let started = std::time::Instant::now();
+                let _memory = crate::memory::Stage::new("publication_commit");
                 pending
                     .conn
                     .execute_batch("COMMIT")
@@ -609,6 +608,7 @@ impl PreparedPublication for PendingPublication {
         // A distinct worker starts only after the commit worker has really exited
         // and released the instance barrier. Never FORCE CHECKPOINT or abort readers.
         let checkpoint = tasks.spawn_blocking_io(move |_| {
+            let _memory = crate::memory::Stage::new("checkpoint");
             let started = std::time::Instant::now();
             if let Err(error) = pending.conn.execute_batch("CHECKPOINT") {
                 tracing::warn!(%error, "post-publication checkpoint deferred; committed WAL is retained");
@@ -633,6 +633,7 @@ impl PreparedPublication for PendingPublication {
     }
 }
 
+#[cfg(test)]
 pub(super) fn read_state(conn: &Connection) -> Result<ManagementState> {
     let mut state = ManagementState {
         sources: read_map(conn, "data_sources")?,
@@ -884,42 +885,54 @@ fn write_changes(
     write_catalogs(conn, before, after)?;
     Ok(())
 }
-fn reuse_unchanged_snapshots(before: &ManagementState, after: &mut ManagementState) {
-    fn same_facts(old: &CatalogSnapshot, new: &CatalogSnapshot) -> bool {
-        old.objects.len() == new.objects.len()
-            && old.objects.iter().zip(&new.objects).all(|(a, b)| {
-                // At most two objects, rather than two entire catalogs, are copied for comparison.
-                let mut a = a.clone();
-                let mut b = b.clone();
-                for o in [&mut a, &mut b] {
-                    for status in o.metadata.status.values_mut() {
+fn reuse_unchanged_snapshots(
+    conn: &Connection,
+    before: &ManagementState,
+    after: &mut ManagementState,
+) -> Result<()> {
+    let mut replacements = Vec::new();
+    for new in after
+        .catalogs
+        .values()
+        .filter(|c| !before.catalogs.contains_key(&c.id))
+    {
+        let Some(old) = before
+            .catalogs
+            .values()
+            .filter(|c| c.incarnation == new.incarnation && c.revision == new.revision)
+            .max_by_key(|c| &c.refreshed_at)
+        else {
+            continue;
+        };
+        if old.stale != new.stale
+            || old.schemas != new.schemas
+            || old.structure_digest != new.structure_digest
+        {
+            continue;
+        }
+        let mut position = 0;
+        let mut equal = true;
+        visit_objects(conn, old, &mut |old| {
+            if let Some(new) = new.objects.get(position) {
+                let mut a = old.clone();
+                let mut b = new.clone();
+                for object in [&mut a, &mut b] {
+                    for status in object.metadata.status.values_mut() {
                         status.last_attempt_at = None;
                         status.last_success_at = None;
                     }
                 }
-                a == b
-            })
-    }
-    let replacements = after
-        .catalogs
-        .values()
-        .filter(|c| !before.catalogs.contains_key(&c.id))
-        .filter_map(|new| {
-            let old = before
-                .catalogs
-                .values()
-                .filter(|c| c.incarnation == new.incarnation && c.revision == new.revision)
-                .max_by_key(|c| &c.refreshed_at)?;
-            if old.stale != new.stale
-                || old.schemas != new.schemas
-                || old.structure_digest != new.structure_digest
-                || !same_facts(old, new)
-            {
-                return None;
+                equal &= a == b;
+            } else {
+                equal = false;
             }
-            Some((new.id.clone(), old.id.clone()))
-        })
-        .collect::<Vec<_>>();
+            position += 1;
+            Ok(())
+        })?;
+        if equal && position == new.objects.len() {
+            replacements.push((new.id.clone(), old.id.clone()));
+        }
+    }
     for (new_id, old_id) in replacements {
         let mut snapshot = after.catalogs.remove(&new_id).unwrap();
         snapshot.id = old_id.clone();
@@ -930,17 +943,20 @@ fn reuse_unchanged_snapshots(before: &ManagementState, after: &mut ManagementSta
             }
         }
     }
+    Ok(())
 }
 pub(super) fn transaction(conn: &Connection, update: ManagementUpdate) -> Result<ManagementState> {
     let started = std::time::Instant::now();
     conn.execute_batch("BEGIN TRANSACTION")
         .map_err(engine_error)?;
     let result = (|| {
-        let before = read_state(conn)?;
+        let before = read_heads(conn)?;
         let mut after = before.clone();
         update(&mut after)?;
-        crate::identity::prepare(conn, &before, &mut after)?;
-        reuse_unchanged_snapshots(&before, &mut after);
+        crate::identity::prepare_with_previous(conn, &before, &mut after, |snapshot, visit| {
+            visit_objects(conn, snapshot, visit)
+        })?;
+        reuse_unchanged_snapshots(conn, &before, &mut after)?;
         write_changes(conn, &before, &after)?;
         conn.execute_batch("COMMIT").map_err(engine_error)?;
         Ok(after)
@@ -1000,7 +1016,7 @@ pub(super) fn initialize(conn: &Connection, config: &Config) -> Result<()> {
                 r.get(0)
             })
             .map_err(engine_error)?;
-        let before = read_state(conn)?;
+        let before = read_heads(conn)?;
         let mut after = before.clone();
         if count == 0 {
             use sha2::{Digest, Sha256};
@@ -1073,8 +1089,10 @@ pub(super) fn initialize(conn: &Connection, config: &Config) -> Result<()> {
         for source in after.sources.values_mut() {
             source.current_operation = None;
         }
-        crate::identity::prepare(conn, &before, &mut after)?;
-        reuse_unchanged_snapshots(&before, &mut after);
+        crate::identity::prepare_with_previous(conn, &before, &mut after, |snapshot, visit| {
+            visit_objects(conn, snapshot, visit)
+        })?;
+        reuse_unchanged_snapshots(conn, &before, &mut after)?;
         write_changes(conn, &before, &after)?;
         conn.execute_batch("COMMIT").map_err(engine_error)?;
         Ok(())
@@ -1194,6 +1212,9 @@ mod tests {
         .unwrap();
         assert!(read_state(&conn).is_err());
         metadata_transaction(&conn, Box::new(|_| Ok(()))).unwrap();
+        transaction(&conn, Box::new(|_| Ok(()))).unwrap();
+        // Startup and virtual-database/control updates also use headers only.
+        initialize(&conn, &config).unwrap();
         assert_eq!(
             conn.query_row(
                 "SELECT payload FROM _fedengine.catalog_objects WHERE key='unrelated'",

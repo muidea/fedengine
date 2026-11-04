@@ -10,6 +10,7 @@ mod functions;
 mod identity;
 mod init;
 mod instance;
+mod memory;
 mod metadata;
 mod projection;
 mod relational;
