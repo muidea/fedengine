@@ -11,11 +11,13 @@
 ## 锁定依赖
 
 - `rust-toolchain.toml` 固定 Rust/Cargo 1.94.0，并声明 rustfmt、Clippy；edition 2024。Workspace 的 `rust-version = "1.94"` 是当前支持基线，尚未承诺更低版本；内部包统一 `publish = false`。
-- Modorch-RS Facade 0.0.1，本地 `../modorch-rs/crates/modorch`。匹配源码 revision `ccc77ce9501cd3e942677bba51b6ff3efb1c63f6`，实际文件指纹由 managed skill preflight 核对。设计中的 v0.3 不视为已发布 API。
+- Modorch-RS Facade 0.0.2，本地 `../modorch-rs/crates/modorch`。锁定 `v0.0.2` 源码 revision `84f22cddd46be1cf5f20023bfec201d1f1fe280d`，匹配 Skill 1.0.5 / Contract 1.1.0；实际文件指纹由 managed skill preflight 核对。该版本为 GitHub Candidate 源码发布，不视为 crates.io 发布或完整生产认证。
 - duckdb-rs 1.20000.1、核心 v2.0.0；pgwire 0.42.1；Cargo.lock 固定传递依赖。
 - 使用 duckdb-rs 官方 download-lib 特性获取对应原生库，避免每次编译庞大的 bundled C++。构建首次需要网络。
 
 当前交付采用 FedEngine 与 Modorch 两个同级仓库；CI 和 Docker 同样准备这两个目录。克隆 Modorch 到同级目录并 checkout 上述 revision。不要把路径依赖替换成未经验证的同名 crate。Linux 动态库位于 `target/duckdb-download/<triple>/v2.0.0/libduckdb.so`；部署需携带该库并设置加载路径，或使用提供的 Dockerfile。
+
+Modorch 0.0.2 的 Topic Name / Filter 采用 MQTT 3.1.1/5.0 语义，`:id` 是字面量，单层通配为 `+`。FedEngine 的 `query/execute/v1`、`catalog/control/v1`、`policy/authorize/v1` 和 `management/control/v1` 均使用精确订阅，不扩大匹配范围；Destination、Request 结果等待、受管任务、ServiceLease 和检查式排空仍按既有组件契约运行。
 
 ## 目录与测试归属
 

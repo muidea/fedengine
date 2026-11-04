@@ -1,6 +1,6 @@
 # 架构与生命周期
 
-默认应用显式启用五个 Initiator、四个 Module；关闭管理 HTTP 时省略 `management-api`；`source-manager` 仍负责静态配置源的 DDL 后刷新。其他 crate 是领域类型或适配库。组件仅使用 Modorch Facade 0.0.1 的已核对公开 API。
+默认应用显式启用五个 Initiator、四个 Module；关闭管理 HTTP 时省略 `management-api`；`source-manager` 仍负责静态配置源的 DDL 后刷新。其他 crate 是领域类型或适配库。组件仅使用 Modorch Facade 0.0.2 的已核对公开 API。
 
 ```mermaid
 flowchart LR

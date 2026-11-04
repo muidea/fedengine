@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MODORCH_REVISION: ccc77ce9501cd3e942677bba51b6ff3efb1c63f6
+  MODORCH_REVISION: 84f22cddd46be1cf5f20023bfec201d1f1fe280d
   CARGO_INCREMENTAL: '0'
 
 jobs:

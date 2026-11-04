@@ -1,8 +1,8 @@
-> Generated snapshot; source: docs/concepts/lifecycle.md; source sha256: c512ab4116ff64dc1bf700485371b3d667d171c6de35d0a27e54eb4a88f3ac28; revision 1.0.3. Do not edit.
+> Generated snapshot; source: docs/concepts/lifecycle.md; source sha256: 2856adefc5bd9fb532bbb01cfd54bf41f00101816d19e0a85e711e739507c3a3; revision 1.0.5. Do not edit.
 
 # 生命周期、补偿与资源固定点
 
-适用 0.0.1；规范见 [Lifecycle](contracts/lifecycle-contract.md) 与 [Resource](contracts/resource-contract.md)。
+适用 0.0.2；规范见 [Lifecycle](contracts/lifecycle-contract.md) 与 [Resource](contracts/resource-contract.md)。
 
 build 校验而不创建实例；start 按拓扑 create/setup，Initiator 导出服务，安装组件 Handler，随后全体 start、全体 ready，开放准入并 activate_ingress。钩子必须及时返回，长任务交给 Context 的 Scheduler。完整时序与资源屏障见实现细节（源码定位：`../lifecycle.md`；从匹配框架源码查询）。
 

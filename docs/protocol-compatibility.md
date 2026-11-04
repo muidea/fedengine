@@ -30,6 +30,8 @@ regclass 名称按当前库、有效 search_path 和权限解析，支持引号�
 
 支持原有标量 OID：bool、int2/int4/int8、float4/float8、numeric、text/varchar、bytea、date/time、timestamp/timestamptz、uuid、json，提供文本/二进制编解码，NULL 使用 -1 长度。numeric 二进制采用 base-10000，DuckDB 执行受 DECIMAL 精度限制；numeric 参数要求显式 DECIMAL(p,s) cast。时间按 UTC、微秒精度处理；每个克隆的执行连接独立设置 UTC，不依赖根连接配置继承。timestamptz 文本结果带 `+00`，timestamp 不附加时区。
 
+PostgreSQL 源端未声明精度和 scale 的 `numeric`（包括生成列）存在经当前锁定扫描路径映射为 `DOUBLE` 的情况，JDBC 元数据和 wire 均按 `float8`（OID 701）展示；高精度源值会在读取时丢失有效数字。已验证的 `numeric(18,2)` 对照列保持 numeric（OID 1700）及精确值，不能由此推断其他精度范围均受支持。该源类型保真缺口留待后续扩展专项统一处理，任意精度数值执行仍按[剩余项方案](remaining-items-plan.md#51-精确-numeric)单独收口。
+
 除法在授权和绑定后统一进行 AST 转换，prepare/describe/execute 使用相同表达式。整数除法向零截断并保持整数类型，浮点除法保持浮点结果；非 NULL 操作数除以零返回 `22012`，`NULL::integer/0` 返回 NULL。精确 numeric 除法尚未实现，DECIMAL 及引擎超宽整数参与的非浮点除法明确返回 `0A000`，避免以双精度浮点数冒充精确结果；除零仍优先报告 `22012`。该限制不等同于拒绝全部 numeric 编解码或其他运算，也不代表其他数值表达式已全面对齐 PG。
 
 `decode(text,text)` 支持不区分大小写的 hex/base64/escape，返回 bytea（OID 17），NULL 参数返回 NULL；非法编码名及 hex/base64 内容返回 `22023`，非法 escape 内容返回 `22P02`。函数在授权后改写到私有实现，嵌套表达式与参数执行沿用同一路径；私有函数不能由用户 SQL 直接调用。

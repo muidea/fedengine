@@ -1,83 +1,83 @@
 {
-  "revision": "1.0.3",
+  "revision": "1.0.5",
   "sources": [
     {
       "target": "references/component-model.md",
       "source": "docs/concepts/component-model.md",
-      "source_sha256": "efb58328efae91cf91949eea6af16acc25eed4d332dacb66dc0f924af2be0fbe",
-      "snapshot_sha256": "b1682d4dc55636e6bb8e41bc0f1ac61accae0ca7e9329d99ccd316241dafed5c"
+      "source_sha256": "81821b126c2b27567c05cff87c33a777530b766f7a7782a90a969d7fa35619e0",
+      "snapshot_sha256": "96af12156055dccc64b66f5d9946896fed8f024f4579b31fe4733ed560501d9d"
     },
     {
       "target": "references/contracts/README.md",
       "source": "contracts/README.md",
-      "source_sha256": "406e52fc4a4da271d4a31a56ab1d5f90ebea4dde3cb342af14419361c8e00744",
-      "snapshot_sha256": "e09a521093099e9474c15acaa65959f976b894f642d7e8713a17b54ac420e563"
+      "source_sha256": "9edcdf896b8cacf8aeea4edd3577100f11231dddaf26636ebff0b9a4afc15dc1",
+      "snapshot_sha256": "6d056624e30d3aa898def303eaa50d23142ddb5acb9dd9bcd3dc12d2f6512f50"
     },
     {
       "target": "references/contracts/compatibility-contract.md",
       "source": "contracts/compatibility-contract.md",
-      "source_sha256": "10ae448a03690eee24502004f17b5a5fac60d5b7501950724fb1e63b03c49118",
-      "snapshot_sha256": "ef7bbd4b2147bedb67cadb267c0c7f510e61635335559f465d7d806dda866ff3"
+      "source_sha256": "fb0eb6208ce196b1d72a4e33bf70684fafbe2dec7be9362c0c0d0088b303a94b",
+      "snapshot_sha256": "19abb126585343f214684d51a776448a1da5833c137238ec1c375fdabb2935b9"
     },
     {
       "target": "references/contracts/component-contract.md",
       "source": "contracts/component-contract.md",
-      "source_sha256": "5970b2a0312652329e2a283fa52664d213e4d1d35ec68360fb5dbc6ba37d12c9",
-      "snapshot_sha256": "dafd97836210f2cacf2f95ab037b8536d2a48412a3cef0d7e94e4355ac4cf39e"
+      "source_sha256": "2a2965c60031e29315638f2a5a19bf6ed01cc36a968e23b646b60224591ac5d8",
+      "snapshot_sha256": "62dbb658963ae6b06702f5f688db9d572a75f59e8a48d117408c6de2e0c13975"
     },
     {
       "target": "references/contracts/dependency-contract.md",
       "source": "contracts/dependency-contract.md",
-      "source_sha256": "57999a49bdd0a5211e85eab2078b8d8708c26ba7af5e7d003c9b7706021fe101",
-      "snapshot_sha256": "0ce0e4600fea2bc874fe900351f311a589c12e345b3e047cf3d1cf3313a904be"
+      "source_sha256": "85672b411b21ec3db9600be4c18af29492704c91d109414ccfe96c317cc74bb9",
+      "snapshot_sha256": "a812cfbb93149d9b59f4960e25873cd2d366c53c0b8ed100de32089f449ac798"
     },
     {
       "target": "references/contracts/lifecycle-contract.md",
       "source": "contracts/lifecycle-contract.md",
-      "source_sha256": "8619b215eefafcc19cc4a037cac5a6d4fbb22d7853075516abb7c7b7fc09798d",
-      "snapshot_sha256": "42588cd2e1dc8eaa7f416e7509e249c130d17466c807d1efc3abec7d7597b66a"
+      "source_sha256": "0dfc4ac16651b70aeb4957f49538ef80fce6f1a7cc1fd2ca2065f92a13f6358c",
+      "snapshot_sha256": "30c0b75d34e9c028cce1e5fb99053fb3f452ae85efacb625c1a65ac72d17b761"
     },
     {
       "target": "references/contracts/messaging-contract.md",
       "source": "contracts/messaging-contract.md",
-      "source_sha256": "05bfc6e8296412a381358736f75c64aabd2861693bd8b3f016d000fe85e82d0e",
-      "snapshot_sha256": "7a48960d8f56d1fc9f9972cacdaab3df1be11d16f567f95484177e0a84463f53"
+      "source_sha256": "987a9e84b16c0746f066732de288f964de5d1454d3377bdaffccd0422b1b0e85",
+      "snapshot_sha256": "4c7183d32ac2929ada424f82b03f2563d7ddbe3b2892ccaedc3dc85a2defe412"
     },
     {
       "target": "references/contracts/resource-contract.md",
       "source": "contracts/resource-contract.md",
-      "source_sha256": "a9c9eee4f637998ec53965ba9c1b3f7f99235b2f83e905dab7e8fc009d13ee9b",
-      "snapshot_sha256": "c3fb2fc51ee0e1c376666ef883b66776c9c379e773a9c8d37b2f90e96c072e6f"
+      "source_sha256": "78dbf4ee1b4c562666c489c4830840ad2ec5f0630a2f5457fdc8bba6c918be07",
+      "snapshot_sha256": "6d9e9a6ddc465af0323956c9beb99ca6c7a9d8a7e4be75bb5f8d063bfd04ba46"
     },
     {
       "target": "references/contracts/scheduler-contract.md",
       "source": "contracts/scheduler-contract.md",
-      "source_sha256": "30a5a18eade561c9ce3dbc34f48f13b160e833cf7f1d0c3a87ce9504b4182aba",
-      "snapshot_sha256": "1aff9005c29587a0e9e87a9e4fe18f3f1b53ddd7ae80e879fb9c022b6ed70f89"
+      "source_sha256": "9b077abd5fc9d4e86f2462c099227e61756a1e61b450ce1a0e6632366453e4bb",
+      "snapshot_sha256": "ea1f3c3569b603cc0209d8e0b36a4fa0bad12fb4458d87874f7d8857f8341da6"
     },
     {
       "target": "references/contracts/validation-contract.md",
       "source": "contracts/validation-contract.md",
-      "source_sha256": "cbfefd88f53a1276d715023574618cfe5324d9e716cc38ce5a683edd24897228",
-      "snapshot_sha256": "f638a00a102a18036b5f329fe4b4f5c799fc89a5cea5ac1873eb2a5fa2af15f3"
+      "source_sha256": "771a93649df96994119854f4d420d39220160f52c8984dc0c288a07b981e40b6",
+      "snapshot_sha256": "a17ea5b51cca71ee8d936a241c9b8ece9b8a0af2194eb09c39e5089ecce9f984"
     },
     {
       "target": "references/lifecycle.md",
       "source": "docs/concepts/lifecycle.md",
-      "source_sha256": "c512ab4116ff64dc1bf700485371b3d667d171c6de35d0a27e54eb4a88f3ac28",
-      "snapshot_sha256": "bf2d7b2a428c60d9f67663dfffdc82b9a735859d4501da4d963674dd985e9f7b"
+      "source_sha256": "2856adefc5bd9fb532bbb01cfd54bf41f00101816d19e0a85e711e739507c3a3",
+      "snapshot_sha256": "40369d3dbbedadafc7a49e96507fa5db244d30c070a0ccb39d8dfcfaec86b936"
     },
     {
       "target": "references/messaging.md",
       "source": "docs/guides/messaging.md",
-      "source_sha256": "f3202f68703b7b9440849e05f9dd35ebf2b397f0165e8477b3e65c35022f75ae",
-      "snapshot_sha256": "0243d3dd53e27c8d10f16dfd1c09f9a2efec02ffda7ed40c3c7230224b3384d9"
+      "source_sha256": "23bc434a82df7c5f2b1a3792c7b68928c0bdbfddcae73b811f5f41ac97a1ad06",
+      "snapshot_sha256": "043e14490986e1efd51f5bd1173d74266cc2cb162fee55397ce182dc4476ed2f"
     },
     {
       "target": "references/validation.md",
       "source": "docs/testing-guide.md",
-      "source_sha256": "1b8158f57b26bba165cf0f27392086774c4dd97fd85397a8cb99147bbaec26a6",
-      "snapshot_sha256": "d0095ac81cced3df35492240f2cc06093f53f59be830048a2ab5c68ffa654965"
+      "source_sha256": "950dab9bca305390cca5eec0a89c5b285c2ba2affda365d1a2291f83beb1e562",
+      "snapshot_sha256": "bdf6c572cf03b4036e95f9da406d2b2b9e04ef8218d9cf5ec29aff921aee6d27"
     }
   ]
 }

@@ -1,10 +1,10 @@
-> Generated snapshot; source: docs/guides/messaging.md; source sha256: f3202f68703b7b9440849e05f9dd35ebf2b397f0165e8477b3e65c35022f75ae; revision 1.0.3. Do not edit.
+> Generated snapshot; source: docs/guides/messaging.md; source sha256: 23bc434a82df7c5f2b1a3792c7b68928c0bdbfddcae73b811f5f41ac97a1ad06; revision 1.0.5. Do not edit.
 
 # Event、Command 与 Request
 
-> Applies to: modorch 0.0.1 开发树，按框架指纹匹配
-> Capability status: Verified（仅本次验证（源码定位：`../validation/2026-11-02/release-0.0.1/README.md`；从匹配框架源码查询）列出的命令与 Linux / Rust 1.94 范围）
-> Last validated: 2026-11-02；本地日志，远程 CI NotRun
+> Applies to: modorch 0.0.2 开发树，按框架指纹匹配
+> Capability status: Verified（仅本次验证（源码定位：`../validation/2026-11-04/release-0.0.2/README.md`；从匹配框架源码查询）列出的命令与 Linux / Rust 1.94 范围）
+> Last validated: 2026-11-04；本地日志，远程 CI NotRun
 
 ## Goal
 
@@ -20,9 +20,11 @@ Rust >= 1.85、Cargo、完整仓库、锁定依赖缓存或首次联网获取依
 
 ## Relevant contracts
 
-[MSG-EVT-001 / MSG-CMD-001 / MSG-REQ-004](contracts/messaging-contract.md)。规范性行为以 Contract 为单一维护点；下文为任务步骤。
+[MSG-EVT-001 / MSG-CMD-001 / MSG-REQ-004 / MSG-TOPIC-001—006](contracts/messaging-contract.md)。规范性行为以 Contract 为单一维护点；下文为任务步骤。
 
 ## Steps
+
+为 DTO 定义版本化 MQTT Topic Name（非空、无 NUL、无 `+/#`、至多 65535 UTF-8 字节）；订阅使用独立 Topic Filter。`orders/+/changed` 匹配 `orders/42/changed`；`orders/+` 包括 `orders/`，`orders/#` 包括 `orders`。`:id` 是字面量，根 `#` 不匹配 `$SYS/status`，需 `$SYS/#`。空层/前后斜线合法，不 trim、不归一化。非法 Name/Filter 返回 InvalidConfig，超过本地 Topic 预算（默认 1024 字节）返回 ResourceLimit；helper 不套用本地预算。审计迁移后的 Handler 和 ACL 匹配范围，见迁移（源码定位：`../migration/0.1-development.md`；从匹配框架源码查询）。不提供 MQTT 网络或共享消费组。
 
 为 DTO 定义版本化 Topic；订阅通过 HandlerRegistration 安装。Event 查看逐目标报告，Command 只确认 Accepted；需要结果用 typed RequestHandle::wait。外部入口使用 hub.external()；Handler 内子调用用 ctx.event_hub。立即准入超额处理 Backpressure，外部可用 *_wait 设单独准入期限。
 
@@ -41,6 +43,7 @@ Rust >= 1.85、Cargo、完整仓库、锁定依赖缓存或首次联网获取依
 ## Validation commands
 
 ```bash
+cargo test -p modorch-eventhub --test topic_conformance --locked
 cargo check -p event-messaging --all-targets --locked
 cargo run -p event-messaging --locked
 cargo test --workspace --all-features --locked

@@ -4,7 +4,7 @@
 
 ## 本地启动
 
-需要 Rust 1.94.0（由 `rust-toolchain.toml` 固定）、C/C++ 运行库，以及同级目录的 `modorch-rs`（真实 Facade 版本 0.0.1）。准确依赖和指纹见 [开发说明](docs/development.md)。
+需要 Rust 1.94.0（由 `rust-toolchain.toml` 固定）、C/C++ 运行库，以及同级目录的 `modorch-rs`（真实 Facade 版本 0.0.2）。准确依赖和指纹见 [开发说明](docs/development.md)。
 
 ```sh
 cargo check --workspace --locked

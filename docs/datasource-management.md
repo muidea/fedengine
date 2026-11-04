@@ -338,7 +338,7 @@ Analyzer、目录解析和运行时源检查使用同一版本快照。请求即
 
 验证命令为 fmt、严格 Clippy、workspace 单元/集成测试、警告视为错误的 Rustdoc、真实进程 smoke 和上述统一数据库集成脚本。真实远端验证组合为 Linux x86_64、DuckDB v2.0.0、锁定扫描扩展、PostgreSQL 17.7 和 MySQL 5.7。其他数据库类型和长时间负载验证不在本阶段覆盖范围。后续已实现的系统目录浏览、统一关系元数据和固定客户端实测见 [元数据实施方案](metadata-query-compatibility-plan.md) 与 [协议兼容说明](protocol-compatibility.md)。
 
-Modorch 预检继续使用项目托管 skill：Facade `0.0.1`，skill revision `1.0.3`，解析框架指纹 `acb53fbd5d8837eeba14d2785450289593e073a92e8499766e90ef57337fa73d`。未改动框架 Runtime 或公共契约。测试日志、数据库、凭据和临时输出不纳入 Git。
+Modorch 预检继续使用项目托管 skill：Facade `0.0.2`，skill revision `1.0.5`，Contract revision `1.1.0`，解析框架指纹 `e87977dbb4ac10ded6c3e5059a0dd5d547ef5e973f3f42e6a637d86647e727e1`。锁定源码与发布边界见[开发说明](development.md)。未改动框架 Runtime 或公共契约。测试日志、数据库、凭据和临时输出不纳入 Git。
 
 ## 虚拟 PostgreSQL Server 的目录边界
 

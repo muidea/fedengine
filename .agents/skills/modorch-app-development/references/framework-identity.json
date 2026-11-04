@@ -1,8 +1,8 @@
 {
   "compatible_versions": [
-    "0.0.1"
+    "0.0.2"
   ],
-  "contracts_revision": "1.0.0",
+  "contracts_revision": "1.1.0",
   "features": [
     "default",
     "runtime",
@@ -11,48 +11,49 @@
     "config-toml",
     "observability"
   ],
-  "framework_version": "0.0.1",
+  "framework_version": "0.0.2",
   "hash_algorithm": "sha256(sorted UTF-8 path + NUL + lowercase file sha256 + LF)",
   "identity": {
     "files": {
       "modorch-config/Cargo.toml": "ac64d9635f40fe5d6ec37839d3ccab34585442d19a6a4e1469cd4619f861dad5",
-      "modorch-config/src/lib.rs": "98200e14a580b7e2e11038d979acd6d1409aa6e42ba218d7cb424497f20b5157",
+      "modorch-config/src/lib.rs": "28d23e5b45d1051831cc78663cd369db4fa09e865afa72e4e1a5e5e3338e2d83",
       "modorch-core/Cargo.toml": "068f2fc96c229303b159347d1d1f95d57babecbca58bfaabc6e51e1b7296f959",
-      "modorch-core/src/failure.rs": "9c0fb1db88e0c5ec304520ad583714d39e77cf03d0384801837775e943a99671",
-      "modorch-core/src/lib.rs": "b527b8be9036a59460652bcf70b2579948621060c1e9b3b47b446a0694168f5c",
-      "modorch-core/src/operation.rs": "c2be751499dd21c727892b90f0dac8956587d3c9e1f711eaa8a27101b7ac65e7",
+      "modorch-core/src/failure.rs": "81f0e5052a4ec08fa236e0d50a9d08225b42c2769fbdeafe60992a634a69fbd2",
+      "modorch-core/src/lib.rs": "163f82c80ecf3519507b702552d91f977b1f5c67d04f70450930d7ff361c1a6a",
+      "modorch-core/src/operation.rs": "0f1653b1a0c4fb455675a90850f33af9dcf12fbf78ca013a2ef2fd712c0132e0",
       "modorch-eventhub/Cargo.toml": "c0bb9d348adc2ec3d90feb9b6273b75b9915dadfb2bdfb43bada889f7e17ebbc",
-      "modorch-eventhub/src/admission.rs": "07a0007bae7dd0a384e18b3935e06b53d40707b058e3184ed4fc27f4961a26be",
+      "modorch-eventhub/src/admission.rs": "7b28dc8b6c739c90c22b81a265cf6b93e8baaf38ca12a9fd7a6104f051d62663",
       "modorch-eventhub/src/lanes.rs": "7ed73fac039bfd12d3d5eefd38574dfacf0e5d81044bacf402968f70eceacbf4",
-      "modorch-eventhub/src/lib.rs": "dc0ba199fe2990b30ad8831baccf0378840b95f92dbd4de553244376632cac3d",
-      "modorch-eventhub/src/limits.rs": "f3702f379f9207f3987fe4d68974422260ef48dbe4e2a342dfc921f2aa4fc984",
-      "modorch-eventhub/src/metrics.rs": "f1169b30a1ed51745bfc5ed8f4c5c01d72f3cd4448c67da26b36e5c4873edb9f",
-      "modorch-eventhub/src/request.rs": "336fa0c6a8771c9bcd2313570e86b191f1372f84da55bad07b6d53d1caf48526",
-      "modorch-eventhub/src/routing.rs": "c87feae637bbf2295b6aef17dc6b83b10a118b3f16139e2eb6c7fafe35cb7bfd",
-      "modorch-eventhub/src/types.rs": "e3d15b678511b0c52b75bade6910ea40d881837aede0734a4ed8c49a5ee3501e",
+      "modorch-eventhub/src/lib.rs": "afd9e7f97e31671a4908920a76663c1cfcbce20c3b7b4fc1c14e3c76eff30b11",
+      "modorch-eventhub/src/limits.rs": "86aa2eb7939302c9a8c9997771a3a7232fdd40b3cf7ca8f08cc960a21d4cc2be",
+      "modorch-eventhub/src/metrics.rs": "fb33de81e423676b6ca6c0b7f2a7262a0cf1183995f5aaa2eb20d6e03107eca6",
+      "modorch-eventhub/src/request.rs": "ed408969959af5f450f7bc07940d2b6936ee4b7e57b7df27b410977e7189bb38",
+      "modorch-eventhub/src/routing.rs": "9d30565e6960d942840ce80498c607cb87b166c3a0234b7355eb21eead40ad3b",
+      "modorch-eventhub/src/topic.rs": "448d7636f3057c0666af43376e01eb9460855b1d814768c947d83eb6949e5f17",
+      "modorch-eventhub/src/types.rs": "9ca60548a5e88f1e8476c34d52726c7b76b6906ab7207c09557d03248574c0c8",
       "modorch-eventhub/src/waitgraph.rs": "1f91caadca46ef7bb1a45475342fd6c8cc7f96ce87939cac9bb9f3438e46bfd2",
-      "modorch-eventhub/src/workers.rs": "047275044528c7c8c77de5468128944769b277de93c01b6046ab4bdb5fd9c7a4",
+      "modorch-eventhub/src/workers.rs": "ab10ff9d25834c8411b8da45a8c709c4ae5d847eb6835b4343d1babdaad34015",
       "modorch-observe/Cargo.toml": "3f4077684d7dc1dd0addb39cf723f23b38b843ae30ba634d8238eb529659b003",
-      "modorch-observe/src/lib.rs": "51b2b9c820e686e1ed2370624663dd6b99936124f2137d4e071394548266c5fe",
+      "modorch-observe/src/lib.rs": "e586c791cec41d751b92c8c2f58be5f5fbd19e31aac6b89cc9db89a818c22ec2",
       "modorch-registry/Cargo.toml": "c8cf97ec3440af80b3cf48607b3934f674aaf357205aab295dc2e8ab27a6aaa6",
-      "modorch-registry/src/lib.rs": "a24485cc158b30f9bc663683c7579d1a3e8de6e3208cdc8a4a3fee4591af53fc",
-      "modorch-registry/src/services.rs": "655f93428826a7d3b3884c0a38afce94da9a5a8cce38473b1d5347ffce6446f6",
+      "modorch-registry/src/lib.rs": "318b69ba57036f8a0cf271e7c0fe22e66f07b7daadccde581ee0ea0543cc87b3",
+      "modorch-registry/src/services.rs": "1352e53e958261f2b830eb57eb8938ea176f45475fb82beea03816a2e5e016ab",
       "modorch-runtime/Cargo.toml": "f53fc46daae8085f0b495f2627a176123bc08053beebbb74af7da37ad6651c9d",
-      "modorch-runtime/src/component.rs": "c336ee4955028087d42ec602712d5e311e9f13f490b5d0e03193d538bccabe54",
-      "modorch-runtime/src/lib.rs": "64e6a6fa06cf72f54461845ae8fb25258506db740b09e6b33f0c42a33c33335d",
-      "modorch-runtime/src/metrics.rs": "dd996d0d2f6986989d21e5296bddb2be6ce7c0ac92e9fdef7c0fa9a4faee1866",
-      "modorch-runtime/src/supervision.rs": "fa5f029b85d449fbddbe8b5f0de6baf2a3f2843ef906240fd47ac8d67a191902",
+      "modorch-runtime/src/component.rs": "1ef1ec4b2f91f7a3e2e628cc972d0cb97beb5f38c05395e36b7032ac1f171688",
+      "modorch-runtime/src/lib.rs": "9aeb6d681ce19fc9d89fbfd2982cb4d30ab4dcb474edabf714b748b6655f5659",
+      "modorch-runtime/src/metrics.rs": "eb4178eec6a3f7675b4bc138f0bd2e444b80db0483c02808231755b401e33402",
+      "modorch-runtime/src/supervision.rs": "0e56a948f785656de3e75725c15ced662f8fcea24c71be985988da4159af2494",
       "modorch-scheduler/Cargo.toml": "b875c2c0575a3a06f7080720e65bac9a9567e06c4eb26a8a1060b05dfbd94763",
-      "modorch-scheduler/src/blocking.rs": "2ee15620c67879de4ffc488ab3fafdded7016592efb9d528bfa90675db4cc23b",
-      "modorch-scheduler/src/lib.rs": "9de82a625a96f91dbc15bfdf9b82944482283ad8bf5e3a90926f880eae44471a",
-      "modorch-scheduler/src/resource_metrics.rs": "2dde61d71be64a0fbeecaeaf7fdb820feac2cd47c6a59c74a7916b893fb2fbda",
+      "modorch-scheduler/src/blocking.rs": "b873603a895229da2cc657a02d6ef40b977505431c91ae939f46b6e1ad76f252",
+      "modorch-scheduler/src/lib.rs": "3d910f5369538058681d9752c2ef9bc1a99143e62ffe975cec90a8b2277ae963",
+      "modorch-scheduler/src/resource_metrics.rs": "838c91f170c776674b87a82bb1045632d8d4a5600842eb7d1c6104a2f46a0697",
       "modorch/Cargo.toml": "a28a922f1a0c9ce5560b61e80796d133af18b88140913c63305dc01effb72b46",
-      "modorch/src/lib.rs": "cf1077fc87452ed8ceca8efcd6066ccd46b41c65ea07d93ce146049ef433d5e4"
+      "modorch/src/lib.rs": "5a5cf3d455e31f20726f2e2a5d705f209fb7738d1cbc5f70f94cb42bb6593998"
     },
-    "sha256": "ba0dbeabab31900cfe8740db6ae03aa282cef17f81fc7b432269851df9410068"
+    "sha256": "0f74320ad90fe433f60b4a5992db5a9addcd40f4aec1fb6ae66317205368ff17"
   },
   "required_features": [
     "runtime"
   ],
-  "skill_revision": "1.0.3"
+  "skill_revision": "1.0.5"
 }

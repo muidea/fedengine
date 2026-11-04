@@ -75,7 +75,7 @@ checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
 
 [[package]]
 name = "modorch"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "async-trait",
  "modorch-core",
@@ -88,7 +88,7 @@ dependencies = [
 
 [[package]]
 name = "modorch-core"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "semver",
  "serde_json",
@@ -99,7 +99,7 @@ dependencies = [
 
 [[package]]
 name = "modorch-eventhub"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -110,7 +110,7 @@ dependencies = [
 
 [[package]]
 name = "modorch-minimal-template"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "modorch",
  "tokio",
@@ -118,7 +118,7 @@ dependencies = [
 
 [[package]]
 name = "modorch-observe"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "modorch-core",
  "modorch-runtime",
@@ -126,14 +126,14 @@ dependencies = [
 
 [[package]]
 name = "modorch-registry"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "modorch-core",
 ]
 
 [[package]]
 name = "modorch-runtime"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -147,7 +147,7 @@ dependencies = [
 
 [[package]]
 name = "modorch-scheduler"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "futures-util",
  "modorch-core",

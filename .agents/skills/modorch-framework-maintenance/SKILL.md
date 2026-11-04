@@ -2,12 +2,12 @@
 name: modorch-framework-maintenance
 description: "维护 Modorch-RS 框架内部、公开 API、Feature、生命周期/消息/调度/资源语义、兼容性和发布门禁时使用；不用于普通业务组件开发。"
 license: MIT
-compatibility: "Rust >= 1.85, Cargo, Python >= 3.11; modorch 0.0.1 with matching source fingerprint"
+compatibility: "Rust >= 1.85, Cargo, Python >= 3.11; modorch 0.0.2 with matching source fingerprint"
 metadata:
-  version: "1.0.3"
-  modorch-skill-revision: "1.0.3"
-  framework-version: "0.0.1"
-  contracts-revision: "1.0.0"
+  version: "1.0.5"
+  modorch-skill-revision: "1.0.5"
+  framework-version: "0.0.2"
+  contracts-revision: "1.1.0"
   author: "Modorch-RS maintainers"
 ---
 
@@ -32,6 +32,7 @@ metadata:
 
 - 暴露受控共享资源选 Initiator + Registry；业务消息/私有状态选 Module；普通 DTO/辅助类型不必成为组件。Module 可以有状态。
 - 注册、启用、实例化和运行分离；默认空选择。requires 需显式启用，IncludeRequired 只在显式选择时补已知强依赖；optional 不自动启用，Initiator 不依赖 Module。
+- Topic Name / Filter 遵循 MQTT 3.1.1/5.0：`+` 匹配单层（含空层），末尾 `#` 含零层，根通配不匹配 `$`；`:id` 是字面量，迁移通配用 `+`。Name 禁止 `+/#`；协议上限 65535 UTF-8 字节，本地预算默认 1024，超限与非法输入分开处理。Topic 与 Destination 正交；不提供 MQTT 网络、QoS 或共享订阅组。
 - Event 看逐目标准入；Command 只确认 Accepted；需要结果用 Request。Queued 超时 CanceledBeforeStart，Running 超时 Indeterminate，不能推断回滚或安全重试。
 - 默认 Serial；Partitioned 同 shard FIFO，Dynamic 有界且空闲回收副本，Concurrent 不保序。LaneKey 不改变目标；不同 Key 不保证固定分片不碰撞。
 - 长期/周期任务用 Owner TaskScheduler；实际单次/周期接口为 delay/interval。CPU 用 spawn_cpu，同步 I/O 用 spawn_blocking_io，不能阻塞 Handler 的宿主执行线程；必要时用有界准入等待。
